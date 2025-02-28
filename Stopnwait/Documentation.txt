@@ -1,0 +1,21 @@
+/*
+NAME: MORE AAYUSH BABASAHEB
+ROLL NO.: 22CS30063
+ASSIGNMENT: 4
+*/
+
+Achieved: Realiable transfer over UDP. As not used shared memory, thus no initprocess required
+
+k_socket:   This makes a socket.
+k_bind:     This binds the socket.
+k_sendto:   This sends the packet to destination. 
+k_recvfrom: This recv from the remote IP.
+k_close:    This closes the socket.
+
+Usage:
+    1. first call the ---- make all ---- command;
+    2. then call the ---- make run_user2 ---- command;
+    3. then call the ---- make run_user1 ---- command;
+
+User1 and User2 IP and ports can be set in the makefile
+Input and output filenames specified in makefile

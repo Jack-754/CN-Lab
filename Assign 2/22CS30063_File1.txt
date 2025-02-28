@@ -1,0 +1,5 @@
+HELLO
+abc
+bca
+cab
+FINISH

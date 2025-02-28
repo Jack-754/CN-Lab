@@ -1,0 +1,8 @@
+HELLO
+abc
+bca
+cab
+CS31206
+CS39006
+CS31208
+FINISH
