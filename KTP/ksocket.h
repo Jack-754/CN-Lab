@@ -16,10 +16,9 @@
 #define p 0.05
 #define T 5
 #define N 25
-#define WINDOW_SIZE 10
 #define SOCK_KTP 3
 #define MAX_RETRIES 5
-#define BUFFER_SIZE 10
+#define WINDOW_SIZE 10
 #define MESSAGE_SIZE 512
 #define ENOSPACE -1
 #define ENOTBOUND -2
@@ -29,20 +28,18 @@ typedef enum state{
     FREE,ALLOTED,TO_CREATE,CREATED,TO_BIND,BOUND,TO_CLOSE
 }STATE;
 
+typedef enum window_state{
+    FREE, SENT, ACKED, NOT_SENT
+}window_state;    
+
 #define P(s) semop(s, &pop, 1)
 #define V(s) semop(s, &vop, 1)
 
-// If SEND window - 
-//     -1: NotSent OR Sent-Acknowledged
-//     i: Sent-NotAcknowledged, ith message in send buffer for send window.
-// If RECEIVE window -
-//     -1: Not Expected
-//     i: Expected, ith message in receive buffer for receive window.
 typedef struct window {
-    int wndw[WINDOW_SIZE];          // maintains which sequence numbers are sent and acknowledged as 0 for unchecked, -1 for not sent, 1 for sent and acknowledged
+    window_state wndw[WINDOW_SIZE]; // state of each sequence number in window
     int size;                       // size of window
     int pointer;                    // points to the first unacknowledged sequence number in window
-    uint8_t seq;              // sequence number for send window and expected sequence number for receiver window
+    int seq;              // sequence number for send window and expected sequence number for receiver window
 }window;
 
 
@@ -54,12 +51,12 @@ typedef struct SM{
     int dest_port;
     char src_ip[16];
     int src_port;
-    char send_buffer[BUFFER_SIZE][MESSAGE_SIZE];
-    int send_buffer_msg_size[BUFFER_SIZE];
+    char send_buffer[WINDOW_SIZE][MESSAGE_SIZE];
+    int send_buffer_msg_size[WINDOW_SIZE];
     int send_msg_count;     // number of messages in buffer currently
     int send_ptr;           // pointer to first message in buffer
-    char recv_buffer[BUFFER_SIZE][MESSAGE_SIZE];
-    int recv_buffer_msg_size[BUFFER_SIZE];
+    char recv_buffer[WINDOW_SIZE][MESSAGE_SIZE];
+    int recv_buffer_msg_size[WINDOW_SIZE];
     int recv_msg_count;     // number of messages in buffer currently
     int recv_ptr;           // pointer to first message in buffer
 

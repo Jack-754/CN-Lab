@@ -16,8 +16,72 @@ void sig_handler(int sig){
     exit(0);
 }
 
+int max(int a, int b){
+    return (a>b)?a:b;
+}
+
 void * R(){
-    
+    fd_set readfds;
+    struct timeval tv;
+    tv.tv_sec=1;
+    tv.tv_usec=0;
+    while(1){
+        FD_ZERO(&readfds);
+        P(sem_SM);
+        int mx=0;
+        for(int i=0; i<N; i++){
+            if(SM_table[i].state==BOUND){
+                FD_SET(SM_table[i].sockfd, &readfds);
+                mx=max(mx, SM_table[i].sockfd);
+            }
+        }
+        V(sem_SM);
+
+        int activity=select(mx+1, &readfds, NULL, NULL, &tv);
+        if(activity<0){
+            perror("Select failed.\n");
+            free_resources();
+            exit(1);
+        }
+
+        P(sem_SM);
+        for(int i=0; i<N; i++){
+            if(SM_table[i].state==BOUND && FD_ISSET(SM_table[i].sockfd, &readfds)){
+                packet tmp;
+                struct sockaddr_in addr;
+                memset(&addr, 0, sizeof(addr));
+                addr.sin_addr.s_addr=inet_addr(SM_table[i].dest_ip);
+                addr.sin_family=AF_INET;
+                addr.sin_port=htons(SM_table[i].dest_port);
+                int len=recvfrom(SM_table[i].sockfd, &tmp, sizeof(packet), 0, NULL, NULL);
+                if(len<0){
+                    perror("Recvfrom failed.\n");
+                    free_resources();
+                    exit(1);
+                }
+                if(dropMessage()){
+                    if((tmp.flag&4)==1){
+                        printf("ACK for packet %d dropped for socket %d\n", tmp.ack_no, i);
+                        continue;
+                    }
+                    else{
+                        printf("Packet %d dropped for socket %d\n", tmp.seq_no, i);
+                        continue;
+                    }
+                }
+                if(tmp.flag&4){
+
+                }
+                else{
+                    
+                }
+            }
+        }
+
+
+        V(sem_SM);
+
+    }
         
 }
 
@@ -26,32 +90,35 @@ void * S(){
         P(sem_SM);
         for(int i=0; i<N; i++){
             // add check for bound state in ksendto function
-            if(SM_table[i].send_msg_count>0 && SM_table[i].swnd.size>0){
+            if(SM_table[i].send_msg_count>0){
                 // create and send packet
                 packet tmp;
                 int idx=-1, seq=SM_table[i].swnd.seq;
                 for(int j=0; j<SM_table[i].send_msg_count; j++){
                     time_t curtime=time(NULL);
-                    if(SM_table[i].swnd.wndw[SM_table[i].swnd.pointer+j]==0 && SM_table[i].time_sent[j+SM_table[i].swnd.pointer]<=curtime){
-                        idx=j+SM_table[i].swnd.pointer;
-                        break;
+
+                    idx=j+SM_table[i].swnd.pointer;
+                    if(SM_table[i].swnd.wndw[idx]==NOT_SENT || (SM_table[i].swnd.wndw[idx]==SENT && SM_table[i].time_sent[idx]<=curtime)){
+
+                        if(SM_table[i].swnd.wndw[idx]==NOT_SENT){
+                            if(SM_table[i].swnd.size>0)SM_table[i].swnd.size--;
+                            else continue;
+                        } 
+                        
+                        strcpy(tmp.data, SM_table[idx].send_buffer[idx]);
+                        tmp.flag=0;
+                        tmp.seq_no=(seq+j>256)?seq+j-256:seq+j;
+                        tmp.len=SM_table[i].send_buffer_msg_size[idx];
+                        struct sockaddr_in addr;
+                        memset(&addr, 0, sizeof(addr));
+                        addr.sin_addr.s_addr=inet_addr(SM_table[i].dest_ip);
+                        addr.sin_family=AF_INET;
+                        addr.sin_port=htons(SM_table[i].dest_port);
+                        sendto(SM_table[i].sockfd, &tmp, sizeof(tmp), 0, (struct sockaddr*)&addr, sizeof(addr));
+                        
                     }
-                    seq++;
                 }
-                if(idx==-1)continue;
-                strcpy(tmp.data, SM_table[idx].send_buffer[idx]);
-                tmp.flag=0;
-                tmp.seq_no=seq;
-                tmp.len=SM_table[i].send_buffer_msg_size[idx];
 
-
-                struct sockaddr_in addr;
-                memset(&addr, 0, sizeof(addr));
-                addr.sin_addr.s_addr=inet_addr(SM_table[i].dest_ip);
-                addr.sin_family=AF_INET;
-                addr.sin_port=htons(SM_table[i].dest_port);
-                sendto(SM_table[i].sockfd, &tmp, sizeof(tmp), 0, (struct sockaddr*)&addr, sizeof(addr));
-                SM_table[i].swnd.size--;
             }
         }
         V(sem_SM);

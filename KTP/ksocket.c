@@ -160,20 +160,21 @@ ssize_t k_sendto(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
     }
 
     // checking if there is space in the send buffer
-    if(SM_table[sockfd].send_msg_count == BUFFER_SIZE){
+    if(SM_table[sockfd].send_msg_count == WINDOW_SIZE){
         errno = ENOSPACE;
         V(sem_SM);
         return -1;
     }
 
     // copying the message to the send buffer
-    int next_free = (SM_table[sockfd].send_ptr + SM_table[sockfd].send_msg_count) % BUFFER_SIZE;
+    int next_free = (SM_table[sockfd].send_ptr + SM_table[sockfd].send_msg_count) % WINDOW_SIZE;
     for(int i = 0; i < len; i++) {
         SM_table[sockfd].send_buffer[next_free][i] = ((char*)buf)[i];
     }
 
     // updating the send message count
     SM_table[sockfd].send_msg_count++;
+    SM_table[sockfd].swnd.wndw[next_free] = NOT_SENT;
 
     // unlocking the semaphore for shared memory access
     V(sem_SM);
@@ -219,7 +220,7 @@ ssize_t k_recvfrom(int sockfd, void *buf, int flags, struct sockaddr *src_addr, 
 
     // Update the receive message count and pointer
     SM_table[sockfd].recv_msg_count--;
-    SM_table[sockfd].recv_ptr = (SM_table[sockfd].recv_ptr + 1) % BUFFER_SIZE;
+    SM_table[sockfd].recv_ptr = (SM_table[sockfd].recv_ptr + 1) % WINDOW_SIZE;
 
     // If src_addr is not NULL, fill it with the source address information
     if(src_addr != NULL){
