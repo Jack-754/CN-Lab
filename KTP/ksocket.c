@@ -122,7 +122,7 @@ int k_bind(char src_ip[], uint16_t src_port, char dest_ip[], uint16_t dest_port)
     SM_table[sockfd].dest_port=dest_port;
     strcpy(SM_table[sockfd].src_ip, src_ip);
     SM_table[sockfd].src_port=src_port;
-
+    SM_table[sockfd].sent_but_not_acked=0;
     // requesting service from initksocket main while loop
     V(sem1);
     P(sem2);
@@ -133,7 +133,7 @@ int k_bind(char src_ip[], uint16_t src_port, char dest_ip[], uint16_t dest_port)
 
 ssize_t k_sendto(int sockfd, void *buf, size_t len, int flags, struct sockaddr *dest_addr, socklen_t *addrlen){
     // checking for message size correctness
-    if(len > MESSAGE_SIZE || len <= 0){
+    if(len > MESSAGE_SIZE || len < 0){
         perror("Message size specified by len attribute not in correct range.\n");
         exit(1);
     }
@@ -175,6 +175,7 @@ ssize_t k_sendto(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
     // updating the send message count
     SM_table[sockfd].send_msg_count++;
     SM_table[sockfd].swnd.wndw[next_free] = NOT_SENT;
+    SM_table[sockfd].send_buffer_msg_size[next_free] = len;
 
     // unlocking the semaphore for shared memory access
     V(sem_SM);
@@ -201,7 +202,7 @@ ssize_t k_recvfrom(int sockfd, void *buf, int flags, struct sockaddr *src_addr, 
     }
 
     // Check if there are any messages in the receive buffer
-    if(SM_table[sockfd].recv_msg_count == 0 || SM_table[sockfd].recv_buffer_msg_size[SM_table[sockfd].recv_ptr] == 0){
+    if(SM_table[sockfd].recv_msg_count == 0 || SM_table[sockfd].rwnd.wndw[SM_table[sockfd].recv_ptr] != RECVD){
         errno = ENOMESSAGE;
         V(sem_SM);
         return -1;
@@ -216,10 +217,11 @@ ssize_t k_recvfrom(int sockfd, void *buf, int flags, struct sockaddr *src_addr, 
     len = SM_table[sockfd].recv_buffer_msg_size[SM_table[sockfd].recv_ptr];
 
     // Mark the message as read
-    SM_table[sockfd].recv_buffer_msg_size[SM_table[sockfd].recv_ptr] = 0;
+    SM_table[sockfd].rwnd.wndw[SM_table[sockfd].recv_ptr] = WFREE;
 
     // Update the receive message count and pointer
     SM_table[sockfd].recv_msg_count--;
+    SM_table[sockfd].rwnd.size=WINDOW_SIZE-SM_table[sockfd].recv_msg_count;
     SM_table[sockfd].recv_ptr = (SM_table[sockfd].recv_ptr + 1) % WINDOW_SIZE;
 
     // If src_addr is not NULL, fill it with the source address information

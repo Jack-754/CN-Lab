@@ -20,10 +20,57 @@ int max(int a, int b){
     return (a>b)?a:b;
 }
 
+int seqtoidx(int seq, int curseq, int pointer){
+    int tmp=seq-curseq;
+    if(tmp<0)tmp+=256;
+    return (pointer+tmp)%WINDOW_SIZE;
+}
+
+int incr(int cur, int mn, int mx){
+    cur++;
+    if(cur>mx)cur=mn;
+    return cur;
+}
+
+void print_sm_table_entry(int sockfd) {
+    if (sockfd < 0 || sockfd >= N || SM_table[sockfd].state == FREE) {
+        printf("Socket %d is invalid or not allocated.\n", sockfd);
+    } else {
+        printf("Socket %d State: %d\n", sockfd, SM_table[sockfd].state);
+        printf("Sent but not acknowledged: %d\n", SM_table[sockfd].sent_but_not_acked);
+        printf("Send window pointer: %d\n", SM_table[sockfd].swnd.pointer);
+        printf("Send window sequence: %d\n", SM_table[sockfd].swnd.seq);
+        printf("Send window size: %d\n", SM_table[sockfd].swnd.size);
+        for(int i=0; i<WINDOW_SIZE; i++){
+            printf("%3d ", SM_table[sockfd].swnd.wndw[i]);
+        }
+        printf("\n");
+        for(int i=0; i<WINDOW_SIZE; i++){
+            printf("%3d ", SM_table[sockfd].send_buffer_msg_size[i]);
+        }
+        printf("\n");
+        printf("Receive window pointer: %d\n", SM_table[sockfd].rwnd.pointer);
+        printf("Receive window sequence: %d\n", SM_table[sockfd].rwnd.seq);
+        printf("Receive window size: %d\n", SM_table[sockfd].rwnd.size);
+        for(int i=0; i<WINDOW_SIZE; i++){
+            printf("%3d ", SM_table[sockfd].rwnd.wndw[i]);
+        }
+        printf("\n");
+        for(int i=0; i<WINDOW_SIZE; i++){
+            printf("%3d ", SM_table[sockfd].recv_buffer_msg_size[i]);
+        }
+        printf("\n");
+    }
+    printf("************************************************\n\n");
+}
+
+
 void * R(){
+    printf("Started R thread\n");
+    fflush(stdout);
     fd_set readfds;
     struct timeval tv;
-    tv.tv_sec=1;
+    tv.tv_sec=5;
     tv.tv_usec=0;
     while(1){
         FD_ZERO(&readfds);
@@ -37,11 +84,54 @@ void * R(){
         }
         V(sem_SM);
 
-        int activity=select(mx+1, &readfds, NULL, NULL, &tv);
-        if(activity<0){
+        int activity = select(mx+1, &readfds, NULL, NULL, &tv);
+        if(activity < 0){
             perror("Select failed.\n");
             free_resources();
             exit(1);
+        }
+
+        // Handle select timeout - check for nospace condition
+        if(activity == 0) {
+            tv.tv_sec = 5;    // Reinitialize timeout
+            tv.tv_usec = 0;
+            
+            P(sem_SM);
+            for(int i=0; i<N; i++) {
+                if(SM_table[i].state == BOUND && SM_table[i].nospace > 0) {
+                    
+                    // If space is available, send duplicate ACK
+                    if(SM_table[i].rwnd.size > 0) {
+                        if(SM_table[i].nospace > MAX_TRIES) {
+                            // Close connection if max tries exceeded
+                            printf("Max tries exceeded for socket %d, closing connection\n", i);
+                            SM_table[i].state = TO_CLOSE;
+                            V(sem1);
+                            P(sem2);
+                            continue;
+                        }
+
+                        packet ack;
+                        ack.flag = 4 | (1 << 3);  // Set ACK flag and 4th bit
+                        ack.ack_no = SM_table[i].rwnd.seq - 1;
+                        ack.window = SM_table[i].rwnd.size;
+                        
+                        struct sockaddr_in addr;
+                        memset(&addr, 0, sizeof(addr));
+                        addr.sin_addr.s_addr = inet_addr(SM_table[i].dest_ip);
+                        addr.sin_family = AF_INET;
+                        addr.sin_port = htons(SM_table[i].dest_port);
+                        
+                        sendto(SM_table[i].sockfd, &ack, sizeof(ack), 0, 
+                               (struct sockaddr*)&addr, sizeof(addr));
+                        
+                        printf("Space available notification sent for socket %d (attempt %d)\n", i, SM_table[i].nospace);
+                        SM_table[i].nospace++;  // Increment nospace counter
+                    }
+                }
+            }
+            V(sem_SM);
+            continue;
         }
 
         P(sem_SM);
@@ -54,6 +144,13 @@ void * R(){
                 addr.sin_family=AF_INET;
                 addr.sin_port=htons(SM_table[i].dest_port);
                 int len=recvfrom(SM_table[i].sockfd, &tmp, sizeof(packet), 0, NULL, NULL);
+
+                // DEBUGGING
+                char str[11]; // 10 characters + null terminator
+                strncpy(str, tmp.data, 10);
+                str[10] = '\0'; // Null-terminate the string
+                printf("R %d %d %d %d %d str:%s\n", tmp.seq_no, tmp.ack_no, tmp.flag, tmp.window, tmp.len, str);
+
                 if(len<0){
                     perror("Recvfrom failed.\n");
                     free_resources();
@@ -69,23 +166,87 @@ void * R(){
                         continue;
                     }
                 }
-                if(tmp.flag&4){
-
+                if(tmp.flag&(1<<2)){
+                    printf("Received ACK for packet %d from socket %d\n", tmp.ack_no, i);
+                    
+                    // Handle ACK with 4th bit set (space notification)
+                    if(tmp.flag & (1 << 3)) {
+                        SM_table[i].swnd.size = tmp.window;
+                        
+                        // If send buffer is empty, send acknowledgment
+                        if(SM_table[i].send_msg_count == 0) {
+                            packet response;
+                            response.flag = 1 << 3;  // Set only 4th bit
+                            sendto(SM_table[i].sockfd, &response, sizeof(response), 0,
+                                   (struct sockaddr*)&addr, sizeof(addr));
+                        }
+                        // Continue normal ACK processing
+                    }
+                    int idx=seqtoidx(tmp.ack_no, SM_table[i].swnd.seq, SM_table[i].swnd.pointer);
+                    if(SM_table[i].swnd.wndw[idx]==SENT || SM_table[i].swnd.wndw[idx]==ACKED){
+                        SM_table[i].swnd.wndw[idx]=ACKED;
+                        while(idx==SM_table[i].swnd.pointer && SM_table[i].swnd.wndw[idx]==ACKED){
+                            SM_table[i].swnd.wndw[idx]=WFREE;
+                            SM_table[i].send_buffer_msg_size[idx]=0;
+                            SM_table[i].send_msg_count--;
+                            idx=(idx+1)%WINDOW_SIZE;
+                            SM_table[i].sent_but_not_acked--;
+                            SM_table[i].swnd.pointer=idx;
+                            SM_table[i].swnd.seq=incr(SM_table[i].swnd.seq, 1, 256);
+                            SM_table[i].swnd.size=tmp.window;
+                        }
+                    }
+                    else{
+                        printf("Invalid ACK received for packet %d from socket %d\n", tmp.ack_no, i);
+                    }
                 }
                 else{
-                    
+                    // Reset nospace if 4th bit is set
+                    if(tmp.flag & (1 << 3)) {
+                        SM_table[i].nospace = 0;
+                        continue;
+                    }
+                    int seq_no = tmp.seq_no;
+                    int curseq = SM_table[i].rwnd.seq;
+                    int diff = (seq_no - curseq + 256) % 256;
+                    if (diff >= SM_table[i].rwnd.size) {
+                        printf("Packet %d out of window for socket %d\n", seq_no, i);
+                        continue;
+                    }
+                    int idx=seqtoidx(tmp.seq_no, SM_table[i].rwnd.seq, SM_table[i].rwnd.pointer);
+                    if(SM_table[i].rwnd.wndw[idx]==WFREE){
+                        printf("Received packet %d from socket %d\n", tmp.seq_no, i);
+                        SM_table[i].rwnd.wndw[idx]=RECVD;
+                        for (int j = 0; j < tmp.len; j++) {
+                            SM_table[i].recv_buffer[idx][j] = tmp.data[j];
+                        }
+                        SM_table[i].recv_buffer_msg_size[idx]=tmp.len;
+                        SM_table[i].recv_msg_count++;
+                        SM_table[i].rwnd.size = WINDOW_SIZE - SM_table[i].recv_msg_count;
+                        if (SM_table[i].rwnd.size == 0) {
+                            SM_table[i].nospace = 1;
+                        } else {
+                            SM_table[i].nospace = 0;
+                        }
+                        packet ack;
+                        ack.ack_no=tmp.seq_no;
+                        ack.flag=4;
+                        ack.window = SM_table[i].rwnd.size;
+                        sendto(SM_table[i].sockfd, &ack, sizeof(ack), 0, (struct sockaddr*)&addr, sizeof(addr));
+                    }
+                    else{
+                        printf("Duplicate packet %d received from socket %d\n", tmp.seq_no, i);
+                    }
                 }
             }
         }
-
-
         V(sem_SM);
-
     }
-        
 }
 
 void * S(){
+    printf("Started S thread\n");
+    fflush(stdout);
     while(1){sleep(T/2);
         P(sem_SM);
         for(int i=0; i<N; i++){
@@ -97,25 +258,38 @@ void * S(){
                 for(int j=0; j<SM_table[i].send_msg_count; j++){
                     time_t curtime=time(NULL);
 
-                    idx=j+SM_table[i].swnd.pointer;
-                    if(SM_table[i].swnd.wndw[idx]==NOT_SENT || (SM_table[i].swnd.wndw[idx]==SENT && SM_table[i].time_sent[idx]<=curtime)){
-
+                    idx = (SM_table[i].swnd.pointer + j) % WINDOW_SIZE;
+                    if(SM_table[i].swnd.wndw[idx]==NOT_SENT || (SM_table[i].swnd.wndw[idx] == SENT && (curtime - SM_table[i].time_sent[idx]) >= T)){
                         if(SM_table[i].swnd.wndw[idx]==NOT_SENT){
-                            if(SM_table[i].swnd.size>0)SM_table[i].swnd.size--;
-                            else continue;
+                            if(SM_table[i].swnd.size>0) {
+                                SM_table[i].swnd.size--;
+                                SM_table[i].sent_but_not_acked++;
+                            } else {
+                                continue;  // Skip if window is full
+                            }
                         } 
-                        
-                        strcpy(tmp.data, SM_table[idx].send_buffer[idx]);
+                        for(int j=0; j<SM_table[i].send_buffer_msg_size[idx]; j++){
+                            tmp.data[j]=SM_table[i].send_buffer[idx][j];
+                        }
                         tmp.flag=0;
-                        tmp.seq_no=(seq+j>256)?seq+j-256:seq+j;
+                        tmp.seq_no = (SM_table[i].swnd.seq + j - 1) % 256 + 1;
                         tmp.len=SM_table[i].send_buffer_msg_size[idx];
                         struct sockaddr_in addr;
                         memset(&addr, 0, sizeof(addr));
                         addr.sin_addr.s_addr=inet_addr(SM_table[i].dest_ip);
                         addr.sin_family=AF_INET;
                         addr.sin_port=htons(SM_table[i].dest_port);
+
+                        // DEBUGGING
+                        char str[11]; // 10 characters + null terminator
+                        strncpy(str, tmp.data, 10);
+                        str[10] = '\0'; // Null-terminate the string
+                        printf("S %d %d %d %d %d str:%s\n", idx, tmp.seq_no, tmp.flag, tmp.window, tmp.len, str);
+                        print_sm_table_entry(i);
+
                         sendto(SM_table[i].sockfd, &tmp, sizeof(tmp), 0, (struct sockaddr*)&addr, sizeof(addr));
-                        
+                        SM_table[i].time_sent[idx] = time(NULL);  // Update next send time
+                        SM_table[i].swnd.wndw[idx] = SENT;        // Mark as sent
                     }
                 }
 
@@ -126,12 +300,20 @@ void * S(){
 }
 
 void * G(){
+    printf("Started G thread\n");
+    fflush(stdout);
     while(1){
         sleep(T);
         P(sem_SM);
         for(int i=0; i<N; i++){
             if(SM_table[i].state!=FREE && kill(SM_table[i].pid, 0)!=0){
                 SM_table[i].state=FREE;
+                for(int j = 0; j < WINDOW_SIZE; j++) {
+                    SM_table[i].swnd.wndw[j] = WFREE;  
+                    SM_table[i].rwnd.wndw[j] = WFREE;
+                }
+                SM_table[i].swnd.size = WINDOW_SIZE;
+                SM_table[i].rwnd.size = WINDOW_SIZE;
             }
         }
         V(sem_SM);
@@ -139,6 +321,7 @@ void * G(){
 }
 
 int main(){
+    printf("Starting initksocket.c main\n");
     srand(time(0));
     signal(SIGINT, sig_handler);
 
@@ -148,6 +331,8 @@ int main(){
     key_sem1=ftok("makefile", 3);
     key_sem2=ftok("makefile", 4);
 
+    printf("Creating semaphores and shared memory\n");
+    fflush(stdout);
     if(key_sem_SM==-1 || key_shmid_SM==-1 || key_sem1==-1 || key_sem2==-1){
         perror("ftok failed in initksocket.c\n");
         exit(1);
@@ -157,6 +342,8 @@ int main(){
     sem1=semget(key_sem1, 1, 0666|IPC_CREAT);
     sem2=semget(key_sem2, 1, 0666|IPC_CREAT);
     shmid_SM=shmget(key_shmid_SM, sizeof(struct SM)*N, 0666|IPC_CREAT);
+
+    printf("%d \n", shmid_SM);
 
     if(sem_SM==-1 || sem1==-1 || sem2==-1 || shmid_SM==-1){
         perror("semget or shmget failed in initksocket.c\n");
@@ -168,6 +355,11 @@ int main(){
         exit(1);
     }
 
+    pop.sem_num = vop.sem_num = 0;
+    pop.sem_flg = vop.sem_flg = 0;
+    pop.sem_op = -1;
+    vop.sem_op = 1;
+
     SM_table=(struct SM*)shmat(shmid_SM, 0, 0);
 
     if(SM_table==(void *)-1){
@@ -175,12 +367,25 @@ int main(){
         exit(1);
     }
 
+    printf("About to take sem_SM semaphore\n");
+    fflush(stdout);
     P(sem_SM);
+    printf("Took sem_SM semaphore\n");
+    fflush(stdout);
+
     for(int i=0; i<N; i++){
         SM_table[i].state=FREE;
+        for(int j = 0; j < WINDOW_SIZE; j++) {
+            SM_table[i].swnd.wndw[j] = WFREE;
+            SM_table[i].rwnd.wndw[j] = WFREE;
+        }
+        SM_table[i].swnd.size = WINDOW_SIZE;
+        SM_table[i].rwnd.size = WINDOW_SIZE;
     }
     V(sem_SM);
 
+    printf("Creating threads\n");
+    fflush(stdout);
     pthread_t S_thread, R_thread, G_thread;
     pthread_attr_t attr;
     int ret;
@@ -217,6 +422,10 @@ int main(){
     // Destroy thread attributes (no longer needed)
     pthread_attr_destroy(&attr);
 
+    // main loop for creating, binding and closing sockets, services are requested through semaphore sem1 and sem2 is used to signal the completion of the service
+
+    printf("Starting initksocket.c main while loop\n");
+    fflush(stdout);
     while(1){
         P(sem1);
 
@@ -256,13 +465,19 @@ int main(){
                 SM_table[i].state=BOUND;
                 break;
             }
-            else if(SM_table[i].state=TO_CLOSE){
+            else if(SM_table[i].state==TO_CLOSE){
                 if(close(SM_table[i].sockfd)<0){
                     perror("Close failed.\n");
                     free_resources();
                     exit(1);
                 }
                 SM_table[i].state=FREE;
+                for(int j = 0; j < WINDOW_SIZE; j++) {
+                    SM_table[i].swnd.wndw[j] = WFREE;  
+                    SM_table[i].rwnd.wndw[j] = WFREE;
+                }
+                SM_table[i].swnd.size = WINDOW_SIZE;
+                SM_table[i].rwnd.size = WINDOW_SIZE;
                 break;
             }
         }
