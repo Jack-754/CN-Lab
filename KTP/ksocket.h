@@ -13,7 +13,7 @@
 #include <signal.h>
 #include <errno.h>
 
-#define p 0.05
+#define p 0
 #define T 5
 #define N 25
 #define SOCK_KTP 3

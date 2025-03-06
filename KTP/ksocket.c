@@ -123,6 +123,10 @@ int k_bind(char src_ip[], uint16_t src_port, char dest_ip[], uint16_t dest_port)
     strcpy(SM_table[sockfd].src_ip, src_ip);
     SM_table[sockfd].src_port=src_port;
     SM_table[sockfd].sent_but_not_acked=0;
+    for(int j=0; j<WINDOW_SIZE; j++){
+        SM_table[sockfd].swnd.wndw[j]=WFREE;
+        SM_table[sockfd].rwnd.wndw[j]=WFREE;
+    }
     // requesting service from initksocket main while loop
     V(sem1);
     P(sem2);
@@ -168,7 +172,7 @@ ssize_t k_sendto(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 
     // copying the message to the send buffer
     int next_free = (SM_table[sockfd].send_ptr + SM_table[sockfd].send_msg_count) % WINDOW_SIZE;
-    printf("next_free: %d send_ptr:%d send_msg_count:%d\n", next_free, SM_table[sockfd].send_ptr, SM_table[sockfd].send_msg_count);
+    printf("next_free: %d send_ptr:%d send_msg_count:%d window:%d\n", next_free, SM_table[sockfd].send_ptr, SM_table[sockfd].send_msg_count, SM_table[sockfd].swnd.size);
     for(int i = 0; i < len; i++) {
         SM_table[sockfd].send_buffer[next_free][i] = ((char*)buf)[i];
     }
@@ -192,8 +196,10 @@ ssize_t k_recvfrom(int sockfd, void *buf, int flags, struct sockaddr *src_addr, 
     init();
     int len;
 
+    fflush(NULL);
     // Lock the semaphore for shared memory access
     P(sem_SM);
+    fflush(NULL);
 
     // Check if the socket file descriptor is valid and bound
     if(sockfd >= N || sockfd < 0 || SM_table[sockfd].state != BOUND){
@@ -216,6 +222,8 @@ ssize_t k_recvfrom(int sockfd, void *buf, int flags, struct sockaddr *src_addr, 
 
     // Get the length of the received message
     len = SM_table[sockfd].recv_buffer_msg_size[SM_table[sockfd].recv_ptr];
+
+    printf("recv_msg_count: %d recv_ptr: %d len: %d\n", SM_table[sockfd].recv_msg_count, SM_table[sockfd].recv_ptr, len);
 
     // Mark the message as read
     SM_table[sockfd].rwnd.wndw[SM_table[sockfd].recv_ptr] = WFREE;

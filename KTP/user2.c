@@ -54,6 +54,7 @@ int main() {
         if(bytes_received<0){
             if(errno==ENOSPACE){
                 perror("No space in receiver window");
+                sleep(5);
             }
             else{
                 perror("Receive failed");

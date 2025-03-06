@@ -1,17 +1,153 @@
 DEBUG MODE ON
-Socket created at 0
+Socket created at 1
 Socket created successfully
-Socket 0 bounded.
+Socket 1 bounded.
 Socket bound successfully
-next_free: 0 send_ptr:0 send_msg_count:0
-Message sent.
-Senthi 
-next_free: 1 send_ptr:0 send_msg_count:1
-Message sent.
-Senthello 
-next_free: 2 send_ptr:1 send_msg_count:1
-Message sent.
-Sentnice 
-next_free: 0 send_ptr:2 send_msg_count:1
-Message sent.
-Sentgood 
+Waiting for messages...
+woke up
+waiting for message
+arrived at sem_SM
+locked sem_SM
+recv_msg_count: 3 recv_ptr: 0 len: 3
+Message received.
+message received
+Received 3: hi
+waiting for message
+arrived at sem_SM
+locked sem_SM
+recv_msg_count: 2 recv_ptr: 1 len: 4
+Message received.
+message received
+Received 4: you
+waiting for message
+arrived at sem_SM
+locked sem_SM
+recv_msg_count: 1 recv_ptr: 2 len: 4
+Message received.
+message received
+Received 4: are
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.
+waiting for message
+arrived at sem_SM
+locked sem_SM
+message received
+No message received.

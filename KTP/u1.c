@@ -28,7 +28,7 @@ void debug_mode(){
 }
 
 int main() {
-    debug_mode();
+    //debug_mode();
     // Create socket
     int sockfd = k_socket(AF_INET, SOCK_KTP, 0);
     if (sockfd < 0) {
@@ -59,9 +59,11 @@ int main() {
         scanf("%s", buffer);
         if (k_sendto(sockfd, buffer, strlen(buffer)+1, 0, 
                       (struct sockaddr*)&dest_addr, &addrlen) < 0) {
-            if(errno==ENOSPACE){
+            while(errno==ENOSPACE){
                 printf("No space in buffer\n");
-                sleep(20);
+                sleep(5);
+                if(k_sendto(sockfd, buffer, strlen(buffer)+1, 0, 
+                      (struct sockaddr*)&dest_addr, &addrlen)>0)break;
                 continue;
             }
             perror("Send failed");
@@ -69,6 +71,7 @@ int main() {
             exit(1);
         }
         printf("Sent%s \n", buffer);
+        fflush(NULL);
     }
 
 
