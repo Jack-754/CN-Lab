@@ -1,0 +1,17 @@
+DEBUG MODE ON
+Socket created at 0
+Socket created successfully
+Socket 0 bounded.
+Socket bound successfully
+next_free: 0 send_ptr:0 send_msg_count:0
+Message sent.
+Senthi 
+next_free: 1 send_ptr:0 send_msg_count:1
+Message sent.
+Senthello 
+next_free: 2 send_ptr:1 send_msg_count:1
+Message sent.
+Sentnice 
+next_free: 0 send_ptr:2 send_msg_count:1
+Message sent.
+Sentgood 

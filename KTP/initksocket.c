@@ -70,7 +70,7 @@ void * R(){
     fflush(stdout);
     fd_set readfds;
     struct timeval tv;
-    tv.tv_sec=5;
+    tv.tv_sec=1;
     tv.tv_usec=0;
     while(1){
         FD_ZERO(&readfds);
@@ -93,7 +93,7 @@ void * R(){
 
         // Handle select timeout - check for nospace condition
         if(activity == 0) {
-            tv.tv_sec = 5;    // Reinitialize timeout
+            tv.tv_sec = 1;    // Reinitialize timeout
             tv.tv_usec = 0;
             
             P(sem_SM);
@@ -110,9 +110,9 @@ void * R(){
                             P(sem2);
                             continue;
                         }
-
+                        printf("Sending space available notification for socket %d\n", i);
                         packet ack;
-                        ack.flag = 4 | (1 << 3);  // Set ACK flag and 4th bit
+                        ack.flag = (1 << 2) | (1 << 3);  // Set ACK flag and 4th bit
                         ack.ack_no = SM_table[i].rwnd.seq - 1;
                         ack.window = SM_table[i].rwnd.size;
                         
@@ -157,7 +157,7 @@ void * R(){
                     exit(1);
                 }
                 if(dropMessage()){
-                    if((tmp.flag&4)==1){
+                    if(tmp.flag&(1<<2)){
                         printf("ACK for packet %d dropped for socket %d\n", tmp.ack_no, i);
                         continue;
                     }
@@ -175,37 +175,57 @@ void * R(){
                         
                         // If send buffer is empty, send acknowledgment
                         if(SM_table[i].send_msg_count == 0) {
+                            printf("Sending space available notification acknowdledgment for socket %d\n", i);
                             packet response;
                             response.flag = 1 << 3;  // Set only 4th bit
                             sendto(SM_table[i].sockfd, &response, sizeof(response), 0,
                                    (struct sockaddr*)&addr, sizeof(addr));
                         }
+                        continue;
                         // Continue normal ACK processing
                     }
-                    int idx=seqtoidx(tmp.ack_no, SM_table[i].swnd.seq, SM_table[i].swnd.pointer);
-                    if(SM_table[i].swnd.wndw[idx]==SENT || SM_table[i].swnd.wndw[idx]==ACKED){
-                        SM_table[i].swnd.wndw[idx]=ACKED;
-                        while(idx==SM_table[i].swnd.pointer && SM_table[i].swnd.wndw[idx]==ACKED){
-                            SM_table[i].swnd.wndw[idx]=WFREE;
-                            SM_table[i].send_buffer_msg_size[idx]=0;
-                            SM_table[i].send_msg_count--;
-                            idx=(idx+1)%WINDOW_SIZE;
-                            SM_table[i].sent_but_not_acked--;
-                            SM_table[i].swnd.pointer=idx;
-                            SM_table[i].swnd.seq=incr(SM_table[i].swnd.seq, 1, 256);
-                            SM_table[i].swnd.size=tmp.window;
-                        }
-                    }
-                    else{
+
+                    int expected_seq = SM_table[i].swnd.seq;
+                    int ack_seq = tmp.ack_no;
+
+                    int diff = (ack_seq - expected_seq + 256) % 256;
+                    if (diff < 0) {
+                        // Invalid ACK, ignore
                         printf("Invalid ACK received for packet %d from socket %d\n", tmp.ack_no, i);
-                    }
-                }
-                else{
-                    // Reset nospace if 4th bit is set
-                    if(tmp.flag & (1 << 3)) {
-                        SM_table[i].nospace = 0;
                         continue;
                     }
+
+                    for (int j = 0; j < diff; j++) {
+                        int idx = (SM_table[i].swnd.pointer + j) % WINDOW_SIZE;
+                        if (SM_table[i].swnd.wndw[idx] == SENT || SM_table[i].swnd.wndw[idx] == ACKED) {
+                            SM_table[i].swnd.wndw[idx] = ACKED;
+                        }
+                    }
+
+                    // Move the window pointer and update sequence numbers
+                    SM_table[i].send_ptr=SM_table[i].swnd.pointer = (SM_table[i].swnd.pointer + diff) % WINDOW_SIZE;
+                    SM_table[i].swnd.seq = (SM_table[i].swnd.seq + diff) % 256;
+                    if (SM_table[i].swnd.seq == 0) SM_table[i].swnd.seq = 1; // Adjust for 1-based sequence
+
+                    // Update send buffer counts and window size
+                    SM_table[i].sent_but_not_acked -= diff;
+                    SM_table[i].send_msg_count -= diff;
+                    SM_table[i].swnd.size = tmp.window;
+
+                    // Reset send buffer entries
+                    for (int j = 0; j < diff; j++) {
+                        int idx = (SM_table[i].swnd.pointer - diff + j) % WINDOW_SIZE;
+                        SM_table[i].send_buffer_msg_size[idx] = 0;
+                        SM_table[i].swnd.wndw[idx] = WFREE;
+                    }
+                }
+                // Reset nospace if 4th bit is set
+                else if(tmp.flag & (1 << 3)) {
+                    SM_table[i].nospace = 0;
+                    printf("Resetting nospace for socket %d\n", i);
+                    continue;
+                }
+                else{
                     int seq_no = tmp.seq_no;
                     int curseq = SM_table[i].rwnd.seq;
                     int diff = (seq_no - curseq + 256) % 256;
@@ -307,6 +327,14 @@ void * G(){
         P(sem_SM);
         for(int i=0; i<N; i++){
             if(SM_table[i].state!=FREE && kill(SM_table[i].pid, 0)!=0){
+                if(SM_table[i].state==BOUND){
+                    if(close(SM_table[i].sockfd)<0){
+                        perror("Close failed.\n");
+                        free_resources();
+                        exit(1);
+                    }
+                }
+                printf("Freeing socket %d\n", i);
                 SM_table[i].state=FREE;
                 for(int j = 0; j < WINDOW_SIZE; j++) {
                     SM_table[i].swnd.wndw[j] = WFREE;  

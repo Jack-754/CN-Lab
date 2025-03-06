@@ -29,51 +29,32 @@ int main() {
     struct sockaddr_in src_addr;
     socklen_t addrlen = sizeof(src_addr);
     memset(&src_addr, 0, sizeof(src_addr));
-    
-    // Open output file
-    FILE *fp = fopen("received.txt", "w");
-    if (fp == NULL) {
-        perror("Cannot open received.txt");
-        k_close(sockfd);
-        exit(1);
-    }
 
     printf("Waiting for messages...\n");
-    char buffer[CHUNK_SIZE];
-    int bytes_received;
+    char buffer[100];
 
-    int count=20, last=20;
-    // Receive and write data until we get a zero-length message 
     while (1) {
-        bytes_received = k_recvfrom(sockfd, buffer, 0, 
+        int len = k_recvfrom(sockfd, buffer, 0, 
                                     (struct sockaddr*)&
                                     src_addr, &addrlen) ;
-        if(bytes_received==0){
+        if(len==0){
+            printf("0 sized message received.\n");
             continue;
         }
-        if(bytes_received<0){
-            if(errno==ENOSPACE){
-                perror("No space in receiver window");
+        if(len<0){
+            if(errno==ENOMESSAGE){
+                sleep(1);
             }
             else{
                 perror("Receive failed");
             }
-            sleep(2);
             continue;
         }
-        if (fwrite(buffer, 1, bytes_received, fp) != bytes_received) {
-            perror("Write to file failed");
-            fclose(fp);
-            k_close(sockfd);
-            exit(1);
-        }
-        printf("Received and wrote %d bytes\n", bytes_received);
+        printf("Received %d: %s\n", len, buffer);
     }
 
         
     printf("File received successfully\n");
-    // Close socket
-    fclose(fp);
     k_close(sockfd);
     return 0;
 }

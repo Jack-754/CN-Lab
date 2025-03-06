@@ -168,6 +168,7 @@ ssize_t k_sendto(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 
     // copying the message to the send buffer
     int next_free = (SM_table[sockfd].send_ptr + SM_table[sockfd].send_msg_count) % WINDOW_SIZE;
+    printf("next_free: %d send_ptr:%d send_msg_count:%d\n", next_free, SM_table[sockfd].send_ptr, SM_table[sockfd].send_msg_count);
     for(int i = 0; i < len; i++) {
         SM_table[sockfd].send_buffer[next_free][i] = ((char*)buf)[i];
     }
