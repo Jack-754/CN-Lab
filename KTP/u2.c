@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #define RECEIVER_IP "127.0.0.1"
 #define RECEIVER_PORT 8081
@@ -9,7 +11,24 @@
 #define SENDER_PORT 8080
 #define CHUNK_SIZE 512
 
+void debug_mode(){
+    printf("TURNING ON DEBUG MODE\n");
+    fflush(NULL);
+    char *name ="debug.txt";
+    int fd = open(name, O_WRONLY|O_CREAT, 0777);
+    if(fd==-1){
+        perror("open failed.\n");
+        exit(1);
+    }
+    if(dup2(fd, 1)==-1){
+        perror("dup2 failed.\n");
+        exit(1);
+    }
+    printf("DEBUG MODE ON\n");
+}
+
 int main() {
+    debug_mode();
     // Create socket
     int sockfd = k_socket(AF_INET, SOCK_KTP, 0);
     if (sockfd < 0) {
@@ -29,52 +48,40 @@ int main() {
     struct sockaddr_in src_addr;
     socklen_t addrlen = sizeof(src_addr);
     memset(&src_addr, 0, sizeof(src_addr));
-    
-    // Open output file
-    FILE *fp = fopen("received.txt", "w");
-    if (fp == NULL) {
-        perror("Cannot open received.txt");
-        k_close(sockfd);
-        exit(1);
-    }
 
     printf("Waiting for messages...\n");
-    char buffer[CHUNK_SIZE];
-    int bytes_received;
-
-    int count=20, last=20;
-    // Receive and write data until we get a zero-length message 
+    char buffer[100];
+    sleep(10);
+    printf("woke up\n");
+    fflush(NULL);
     while (1) {
-        bytes_received = k_recvfrom(sockfd, buffer, 0, 
+        printf("waiting for message\n");
+        fflush(NULL);
+        int len = k_recvfrom(sockfd, buffer, 0, 
                                     (struct sockaddr*)&
                                     src_addr, &addrlen) ;
-        if(bytes_received==0){
+        printf("message received\n");
+        fflush(NULL);
+        if(len==0){
+            printf("0 sized message received.\n");
             continue;
         }
-        if(bytes_received<0){
-            if(errno==ENOSPACE){
-                perror("No space in receiver window");
-                sleep(5);
+        if(len<0){
+            if(errno==ENOMESSAGE){
+                printf("No message received.\n");
+                fflush(NULL);
+                sleep(1);
             }
             else{
                 perror("Receive failed");
             }
-            sleep(2);
             continue;
         }
-        if (fwrite(buffer, 1, bytes_received, fp) != bytes_received) {
-            perror("Write to file failed");
-            fclose(fp);
-            k_close(sockfd);
-            exit(1);
-        }
-        printf("Received and wrote %d bytes\n", bytes_received);
+        printf("Received %d: %s\n", len, buffer);
     }
 
         
     printf("File received successfully\n");
-    // Close socket
-    fclose(fp);
     k_close(sockfd);
     return 0;
 }
