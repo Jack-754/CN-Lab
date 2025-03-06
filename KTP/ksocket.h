@@ -18,7 +18,7 @@
 #define N 25
 #define SOCK_KTP 3
 #define MAX_RETRIES 5
-#define WINDOW_SIZE 3
+#define WINDOW_SIZE 10
 #define MESSAGE_SIZE 512
 #define MAX_TRIES 20
 #define ENOSPACE -1

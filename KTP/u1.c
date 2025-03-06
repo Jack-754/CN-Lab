@@ -66,9 +66,6 @@ int main() {
                       (struct sockaddr*)&dest_addr, &addrlen)>0)break;
                 continue;
             }
-            perror("Send failed");
-            k_close(sockfd);
-            exit(1);
         }
         printf("Sent%s \n", buffer);
         fflush(NULL);

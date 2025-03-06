@@ -174,7 +174,7 @@ void * R(){
                     // Handle ACK with 4th bit set (space notification)
                     if(tmp.flag & (1 << 3)) {
                         SM_table[i].swnd.size = tmp.window;
-                        
+                        printf("Received space available notification for socket %d send_msg_count: %d\n", i, SM_table[i].send_msg_count);
                         // If send buffer is empty, send acknowledgment
                         if(SM_table[i].send_msg_count == 0) {
                             printf("Sending space available notification acknowdledgment for socket %d\n", i);
@@ -200,6 +200,10 @@ void * R(){
                     for (int j = 0; j < diff; j++) {
                         int idx = (SM_table[i].swnd.pointer + j) % WINDOW_SIZE;
                         if (SM_table[i].swnd.wndw[idx] == SENT || SM_table[i].swnd.wndw[idx] == ACKED) {
+                            if(SM_table[i].swnd.wndw[idx] == SENT){
+                                SM_table[i].sent_but_not_acked--;
+                                SM_table[i].send_msg_count--;
+                            }
                             SM_table[i].swnd.wndw[idx] = ACKED;
                         }
                     }
@@ -208,9 +212,7 @@ void * R(){
                     SM_table[i].send_ptr=SM_table[i].swnd.pointer = (SM_table[i].swnd.pointer + diff) % WINDOW_SIZE;
                     SM_table[i].swnd.seq = (SM_table[i].swnd.seq + diff-1) % 256+1;
 
-                    // Update send buffer counts and window size
-                    SM_table[i].sent_but_not_acked -= diff;
-                    SM_table[i].send_msg_count -= diff;
+                    
                     SM_table[i].swnd.size = tmp.window;
 
                     // Reset send buffer entries
