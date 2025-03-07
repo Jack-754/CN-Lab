@@ -196,7 +196,10 @@ void * R(){
                         printf("Invalid ACK received for packet %d on socket %d\n", tmp.ack_no, i);
                         continue;
                     }
-
+                    // RESET RETRY COUNTER IF ACK IS FOR A OLDEST UNACKED PACKET
+                    if(diff>0){
+                        SM_table[i].send_retries=0;
+                    }
                     for (int j = 0; j < diff; j++) {
                         int idx = (SM_table[i].swnd.pointer + j) % WINDOW_SIZE;
                         if (SM_table[i].swnd.wndw[idx] == SENT || SM_table[i].swnd.wndw[idx] == ACKED) {
@@ -308,6 +311,7 @@ void * S(){
                                 continue;  // Skip if window is full
                             }
                         }
+                        // ADDED CODE FOR RETRY LIMIT
                         else if(idx==SM_table[i].swnd.pointer){
                             SM_table[i].send_retries++;
                             if(SM_table[i].send_retries>MAX_TRIES){
