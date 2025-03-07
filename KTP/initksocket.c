@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <sys/select.h>
 
+// Frees all allocated system resources including shared memory and semaphores
 void free_resources(){
     shmdt(SM_table);
     semctl(sem_SM, 0, IPC_RMID);
@@ -11,27 +12,37 @@ void free_resources(){
     shmctl(shmid_SM, IPC_RMID, NULL);
 }
 
+// Signal handler for SIGINT (Ctrl+C)
+// Cleans up resources before program termination
 void sig_handler(int sig){
     free_resources();
     exit(0);
 }
 
+// Returns the larger of two integers
+// Parameters:
+//   a, b: integers to compare
+// Returns: the maximum value between a and b
 int max(int a, int b){
     return (a>b)?a:b;
 }
 
+// Converts a sequence number to an index in the sliding window
+// Parameters:
+//   seq: sequence number to convert
+//   curseq: current sequence number
+//   pointer: current window pointer
+// Returns: the corresponding window index
 int seqtoidx(int seq, int curseq, int pointer){
     int tmp=seq-curseq;
     if(tmp<0)tmp+=256;
     return (pointer+tmp)%WINDOW_SIZE;
 }
 
-int incr(int cur, int mn, int mx){
-    cur++;
-    if(cur>mx)cur=mn;
-    return cur;
-}
-
+// Serializes a packet structure into a byte buffer for network transmission
+// Parameters:
+//   pkt: pointer to packet structure to serialize
+//   buffer: destination buffer for serialized data
 void serialize_packet(packet *pkt, uint8_t *buffer) {
     int seq_no_n = htonl(pkt->seq_no);
     int ack_no_n = htonl(pkt->ack_no);
@@ -47,6 +58,10 @@ void serialize_packet(packet *pkt, uint8_t *buffer) {
     memcpy(buffer + 16 + MESSAGE_SIZE, &window_n, sizeof(window_n));
 }
 
+// Deserializes a byte buffer into a packet structure
+// Parameters:
+//   pkt: pointer to packet structure to populate
+//   buffer: source buffer containing serialized packet data
 void deserialize_packet(packet *pkt, uint8_t *buffer) {
     int seq_no_n, ack_no_n, len_n, flag_n, window_n;
 
@@ -64,6 +79,9 @@ void deserialize_packet(packet *pkt, uint8_t *buffer) {
     pkt->window = ntohl(window_n);
 }
 
+// Prints the current state and contents of a socket's entry in the SM_table for debugging purpose
+// Parameters:
+//   sockfd: socket file descriptor to print information for
 void print_sm_table_entry(int sockfd) {
     if (sockfd < 0 || sockfd >= N || SM_table[sockfd].state == FREE) {
         printf("Socket %d is invalid or not allocated.\n", sockfd);
@@ -96,7 +114,8 @@ void print_sm_table_entry(int sockfd) {
     printf("************************************************\n\n");
 }
 
-
+// Receiver thread function
+// Handles incoming packets, processes ACKs, and manages flow control
 void * R(){
     printf("Started R thread\n");
     fflush(stdout);
@@ -180,14 +199,13 @@ void * R(){
 
                 uint8_t buffer[PACKET_SIZE];
                 int len=recvfrom(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, NULL, NULL);
-                printf("Packet received\n");
                 deserialize_packet(&tmp, buffer);
 
                 // DEBUGGING
                 char str[11]; // 10 characters + null terminator
                 strncpy(str, tmp.data, 10);
                 str[10] = '\0'; // Null-terminate the string
-                printf("R seq:%d ack:%d flag:%d window:%d len:%d str:%s\n", tmp.seq_no, tmp.ack_no, tmp.flag, tmp.window, tmp.len, str);
+                printf("Packet received seq:%d ack:%d flag:%d window:%d len:%d str:%s\n", tmp.seq_no, tmp.ack_no, tmp.flag, tmp.window, tmp.len, str);
 
                 if(len<0){
                     perror("Recvfrom failed.\n");
@@ -332,6 +350,8 @@ void * R(){
     }
 }
 
+// Sender thread function
+// Handles packet transmission, retransmission, and window management
 void * S(){
     printf("Started S thread\n");
     fflush(stdout);
@@ -389,7 +409,7 @@ void * S(){
                         char str[11]; // 10 characters + null terminator
                         strncpy(str, tmp.data, 10);
                         str[10] = '\0'; // Null-terminate the string
-                        printf("S idx:%d seq:%d flag:%d window:%d len:%d str:%s\n", idx, tmp.seq_no, tmp.flag, tmp.window, tmp.len, str);
+                        printf("Sending packet idx:%d seq:%d flag:%d window:%d len:%d str:%s\n", idx, tmp.seq_no, tmp.flag, tmp.window, tmp.len, str);
 
                         uint8_t buffer[PACKET_SIZE];
                         serialize_packet(&tmp, buffer);
@@ -405,6 +425,8 @@ void * S(){
     }
 }
 
+// Garbage collector thread function
+// Monitors and cleans up inactive sockets
 void * G(){
     printf("Started G thread\n");
     fflush(stdout);
@@ -434,6 +456,9 @@ void * G(){
     }
 }
 
+// Main function
+// Initializes shared memory, semaphores, and creates worker threads
+// Handles socket creation, binding, and closing requests
 int main(){
     printf("Starting initksocket.c main\n");
     srand(time(0));
