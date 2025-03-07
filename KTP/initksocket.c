@@ -339,7 +339,7 @@ void * S(){
         P(sem_SM);
         for(int i=0; i<N; i++){
             // add check for bound state in ksendto function
-            if(SM_table[i].send_msg_count>0){
+            if(SM_table[i].state==BOUND && SM_table[i].send_msg_count>0){
                 // create and send packet
                 packet tmp;
                 int idx=-1, seq=SM_table[i].swnd.seq;
@@ -367,7 +367,7 @@ void * S(){
                                 SM_table[i].state=TO_CLOSE;
                                 V(sem1);
                                 P(sem2);
-                                continue;
+                                break;
                             }
                             else{
                                 printf("Retrying packet %d for socket %d\n", SM_table[i].swnd.seq, i);
