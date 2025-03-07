@@ -263,7 +263,7 @@ int k_close(int sockfd){
         return -1;
     }
     while(1){
-        if(SM_table->sent_but_not_acked>0 || SM_table->send_msg_count>0){
+        if(SM_table[sockfd].sent_but_not_acked>0 || SM_table[sockfd].send_msg_count>0){
             V(sem_SM);
             sleep(T/2);
             P(sem_SM);

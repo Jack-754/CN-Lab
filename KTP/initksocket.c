@@ -184,7 +184,6 @@ void * R(){
                                    (struct sockaddr*)&addr, sizeof(addr));
                         }
                         continue;
-                        // Continue normal ACK processing
                     }
 
                     int expected_seq = SM_table[i].swnd.seq;
@@ -234,11 +233,19 @@ void * R(){
                 else{
                     int seq_no = tmp.seq_no;
                     int curseq = SM_table[i].rwnd.seq;
+
                     int diff = (seq_no - curseq + 256) % 256;
+
                     if (diff >= SM_table[i].rwnd.size) {
-                        printf("Packet %d out of window for socket %d\n", seq_no, i);
+                        packet ack;
+                        ack.ack_no=curseq;
+                        ack.flag=(1<<2);
+                        ack.window = SM_table[i].rwnd.size;
+                        sendto(SM_table[i].sockfd, &ack, sizeof(ack), 0, (struct sockaddr*)&addr, sizeof(addr));
+                        printf("Duplicate packet %d received for socket %d\n", seq_no, i);
                         continue;
                     }
+                    
                     int idx=seqtoidx(tmp.seq_no, SM_table[i].rwnd.seq, SM_table[i].rwnd.pointer);
                     printf("Received packet %d on socket %d\n", tmp.seq_no, i);
 
