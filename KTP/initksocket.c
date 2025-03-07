@@ -32,6 +32,38 @@ int incr(int cur, int mn, int mx){
     return cur;
 }
 
+void serialize_packet(packet *pkt, uint8_t *buffer) {
+    int seq_no_n = htonl(pkt->seq_no);
+    int ack_no_n = htonl(pkt->ack_no);
+    int len_n = htonl(pkt->len);
+    int flag_n = htonl(pkt->flag);
+    int window_n = htonl(pkt->window);
+
+    memcpy(buffer, &seq_no_n, sizeof(seq_no_n));
+    memcpy(buffer + 4, &ack_no_n, sizeof(ack_no_n));
+    memcpy(buffer + 8, pkt->data, MESSAGE_SIZE);  
+    memcpy(buffer + 8 + MESSAGE_SIZE, &len_n, sizeof(len_n));
+    memcpy(buffer + 12 + MESSAGE_SIZE, &flag_n, sizeof(flag_n));
+    memcpy(buffer + 16 + MESSAGE_SIZE, &window_n, sizeof(window_n));
+}
+
+void deserialize_packet(packet *pkt, uint8_t *buffer) {
+    int seq_no_n, ack_no_n, len_n, flag_n, window_n;
+
+    memcpy(&seq_no_n, buffer, sizeof(seq_no_n));
+    memcpy(&ack_no_n, buffer + 4, sizeof(ack_no_n));
+    memcpy(pkt->data, buffer + 8, MESSAGE_SIZE);  
+    memcpy(&len_n, buffer + 8 + MESSAGE_SIZE, sizeof(len_n));
+    memcpy(&flag_n, buffer + 12 + MESSAGE_SIZE, sizeof(flag_n));
+    memcpy(&window_n, buffer + 16 + MESSAGE_SIZE, sizeof(window_n));
+
+    pkt->seq_no = ntohl(seq_no_n);
+    pkt->ack_no = ntohl(ack_no_n);
+    pkt->len = ntohl(len_n);
+    pkt->flag = ntohl(flag_n);
+    pkt->window = ntohl(window_n);
+}
+
 void print_sm_table_entry(int sockfd) {
     if (sockfd < 0 || sockfd >= N || SM_table[sockfd].state == FREE) {
         printf("Socket %d is invalid or not allocated.\n", sockfd);
@@ -124,9 +156,9 @@ void * R(){
                         addr.sin_family = AF_INET;
                         addr.sin_port = htons(SM_table[i].dest_port);
                         
-                        sendto(SM_table[i].sockfd, &ack, sizeof(ack), 0, 
-                               (struct sockaddr*)&addr, sizeof(addr));
-                        
+                        uint8_t buffer[PACKET_SIZE];
+                        serialize_packet(&ack, buffer);
+                        sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
                         printf("Space available notification sent for socket %d (attempt %d)\n", i, SM_table[i].nospace);
                         SM_table[i].nospace++;  // Increment nospace counter
                     }
@@ -145,7 +177,11 @@ void * R(){
                 addr.sin_addr.s_addr=inet_addr(SM_table[i].dest_ip);
                 addr.sin_family=AF_INET;
                 addr.sin_port=htons(SM_table[i].dest_port);
-                int len=recvfrom(SM_table[i].sockfd, &tmp, sizeof(packet), 0, NULL, NULL);
+
+                uint8_t buffer[PACKET_SIZE];
+                int len=recvfrom(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, NULL, NULL);
+                printf("Packet received\n");
+                deserialize_packet(&tmp, buffer);
 
                 // DEBUGGING
                 char str[11]; // 10 characters + null terminator
@@ -180,8 +216,9 @@ void * R(){
                             printf("Sending space available notification acknowdledgment for socket %d\n", i);
                             packet response;
                             response.flag = 1 << 3;  // Set only 4th bit
-                            sendto(SM_table[i].sockfd, &response, sizeof(response), 0,
-                                   (struct sockaddr*)&addr, sizeof(addr));
+                            uint8_t buffer[PACKET_SIZE];
+                            serialize_packet(&response, buffer);
+                            sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0,(struct sockaddr*)&addr, sizeof(addr));
                         }
                         continue;
                     }
@@ -241,7 +278,9 @@ void * R(){
                         ack.ack_no=curseq;
                         ack.flag=(1<<2);
                         ack.window = SM_table[i].rwnd.size;
-                        sendto(SM_table[i].sockfd, &ack, sizeof(ack), 0, (struct sockaddr*)&addr, sizeof(addr));
+                        uint8_t buffer[PACKET_SIZE];
+                        serialize_packet(&ack, buffer);
+                        sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
                         printf("Duplicate packet %d received for socket %d\n", seq_no, i);
                         continue;
                     }
@@ -282,7 +321,9 @@ void * R(){
                     ack.ack_no=curseq;
                     ack.flag=(1<<2);
                     ack.window = SM_table[i].rwnd.size;
-                    sendto(SM_table[i].sockfd, &ack, sizeof(ack), 0, (struct sockaddr*)&addr, sizeof(addr));
+                    uint8_t buffer[PACKET_SIZE];
+                    serialize_packet(&ack, buffer);
+                    sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
                     
                 }
             }
@@ -350,7 +391,9 @@ void * S(){
                         str[10] = '\0'; // Null-terminate the string
                         printf("S idx:%d seq:%d flag:%d window:%d len:%d str:%s\n", idx, tmp.seq_no, tmp.flag, tmp.window, tmp.len, str);
 
-                        sendto(SM_table[i].sockfd, &tmp, sizeof(tmp), 0, (struct sockaddr*)&addr, sizeof(addr));
+                        uint8_t buffer[PACKET_SIZE];
+                        serialize_packet(&tmp, buffer);
+                        sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
                         SM_table[i].time_sent[idx] = time(NULL);  // Update next send time
                         SM_table[i].swnd.wndw[idx] = SENT;        // Mark as sent
                     }

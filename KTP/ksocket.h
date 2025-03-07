@@ -19,6 +19,7 @@
 #define SOCK_KTP 3
 #define WINDOW_SIZE 10
 #define MESSAGE_SIZE 512
+#define PACKET_SIZE (MESSAGE_SIZE + 5 * sizeof(int))
 #define MAX_TRIES 20
 #define ENOSPACE -1
 #define ENOTBOUND -2

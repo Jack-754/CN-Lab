@@ -3,9 +3,9 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define SENDER_IP "10.145.133.99"
+#define SENDER_IP "127.0.0.1"
 #define SENDER_PORT 8080
-#define RECEIVER_IP "10.5.18.72"
+#define RECEIVER_IP "127.0.0.1"
 #define RECEIVER_PORT 8081
 #define CHUNK_SIZE 512
 
