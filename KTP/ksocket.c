@@ -262,6 +262,16 @@ int k_close(int sockfd){
         perror("Socket can't be closed.\n");
         return -1;
     }
+    while(1){
+        if(SM_table->sent_but_not_acked>0 || SM_table->send_msg_count>0){
+            V(sem_SM);
+            sleep(T/2);
+            P(sem_SM);
+        }
+        else{
+            break;
+        }
+    }
     SM_table[sockfd].state=TO_CLOSE;
     V(sem1);
     P(sem2);

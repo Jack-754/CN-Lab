@@ -13,11 +13,10 @@
 #include <signal.h>
 #include <errno.h>
 
-#define p 0
+#define p 0.05
 #define T 5
 #define N 25
 #define SOCK_KTP 3
-#define MAX_RETRIES 5
 #define WINDOW_SIZE 10
 #define MESSAGE_SIZE 512
 #define MAX_TRIES 20
@@ -66,6 +65,7 @@ typedef struct SM{
     int recv_ptr;           // pointer to first unread message in buffer
     int nospace;            // Flag to track if receiver had no space
     int sent_but_not_acked; // Count of messages sent but not acked
+    int send_retries;       // number of times the oldest unacked message is being retried
     window swnd;            // send window
     window rwnd;            // reciever window
 

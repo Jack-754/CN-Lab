@@ -169,7 +169,7 @@ void * R(){
                     }
                 }
                 if(tmp.flag&(1<<2)){
-                    printf("Received ACK for packet %d from socket %d\n", tmp.ack_no, i);
+                    printf("Received ACK for packet %d on socket %d\n", tmp.ack_no, i);
                     
                     // Handle ACK with 4th bit set (space notification)
                     if(tmp.flag & (1 << 3)) {
@@ -191,9 +191,9 @@ void * R(){
                     int ack_seq = tmp.ack_no;
 
                     int diff = (ack_seq - expected_seq + 256) % 256;
-                    if (diff < 0) {
+                    if (diff < 0 || diff>WINDOW_SIZE) {
                         // Invalid ACK, ignore
-                        printf("Invalid ACK received for packet %d from socket %d\n", tmp.ack_no, i);
+                        printf("Invalid ACK received for packet %d on socket %d\n", tmp.ack_no, i);
                         continue;
                     }
 
@@ -237,11 +237,16 @@ void * R(){
                         continue;
                     }
                     int idx=seqtoidx(tmp.seq_no, SM_table[i].rwnd.seq, SM_table[i].rwnd.pointer);
-                    printf("Received packet %d from socket %d\n", tmp.seq_no, i);
+                    printf("Received packet %d on socket %d\n", tmp.seq_no, i);
 
-                    print_sm_table_entry(i);
+                    if(SM_table[i].rwnd.wndw[idx]==WFREE){
+                        SM_table[i].rwnd.wndw[idx]=RECVD;
+                    }
+                    else{
+                        printf("Window slot %d is not free for socket %d\n", idx, i);
+                        continue;
+                    }
 
-                    SM_table[i].rwnd.wndw[idx]=RECVD;
                     for (int j = 0; j < tmp.len; j++) {
                         SM_table[i].recv_buffer[idx][j] = tmp.data[j];
                     }
@@ -259,11 +264,10 @@ void * R(){
                         while(SM_table[i].rwnd.wndw[SM_table[i].rwnd.pointer]==RECVD){
                             cumulative++;
                             SM_table[i].rwnd.pointer=(SM_table[i].rwnd.pointer+1)%WINDOW_SIZE;
-                            if(cumulative==WINDOW_SIZE)break;
+                            if(SM_table[i].rwnd.pointer==SM_table[i].recv_ptr)break;
                         }
                         curseq=SM_table[i].rwnd.seq=(curseq+cumulative-1)%256+1;
                     }
-                    print_sm_table_entry(i);
                     packet ack;
                     ack.ack_no=curseq;
                     ack.flag=(1<<2);
@@ -295,12 +299,28 @@ void * S(){
                     if(SM_table[i].swnd.wndw[idx]==NOT_SENT || (SM_table[i].swnd.wndw[idx] == SENT && (curtime - SM_table[i].time_sent[idx]) >= T)){
                         if(SM_table[i].swnd.wndw[idx]==NOT_SENT){
                             if(SM_table[i].swnd.size>0) {
+                                if(idx==SM_table[i].swnd.pointer){
+                                    SM_table[i].send_retries=0;
+                                }
                                 SM_table[i].swnd.size--;
                                 SM_table[i].sent_but_not_acked++;
                             } else {
                                 continue;  // Skip if window is full
                             }
-                        } 
+                        }
+                        else if(idx==SM_table[i].swnd.pointer){
+                            SM_table[i].send_retries++;
+                            if(SM_table[i].send_retries>MAX_TRIES){
+                                printf("Max tries exceeded for socket %d, closing connection\n", i);
+                                SM_table[i].state=TO_CLOSE;
+                                V(sem1);
+                                P(sem2);
+                                continue;
+                            }
+                            else{
+                                printf("Retrying packet %d for socket %d\n", SM_table[i].swnd.seq, i);
+                            }
+                        }
                         for(int j=0; j<SM_table[i].send_buffer_msg_size[idx]; j++){
                             tmp.data[j]=SM_table[i].send_buffer[idx][j];
                         }
@@ -318,7 +338,6 @@ void * S(){
                         strncpy(str, tmp.data, 10);
                         str[10] = '\0'; // Null-terminate the string
                         printf("S idx:%d seq:%d flag:%d window:%d len:%d str:%s\n", idx, tmp.seq_no, tmp.flag, tmp.window, tmp.len, str);
-                        print_sm_table_entry(i);
 
                         sendto(SM_table[i].sockfd, &tmp, sizeof(tmp), 0, (struct sockaddr*)&addr, sizeof(addr));
                         SM_table[i].time_sent[idx] = time(NULL);  // Update next send time
