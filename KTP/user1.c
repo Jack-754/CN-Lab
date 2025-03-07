@@ -46,11 +46,11 @@ int main() {
 
     // Read and send file contents in chunks
     while ((bytes_read = fread(buffer, 1, CHUNK_SIZE, fp)) > 0) {
-        if (k_sendto(sockfd, buffer, bytes_read, 0, 
+        while (k_sendto(sockfd, buffer, bytes_read, 0, 
                       (struct sockaddr*)&dest_addr, &addrlen) < 0) {
             if(errno==ENOSPACE){
                 printf("No space in buffer\n");
-                sleep(5);
+                sleep(1);
                 continue;
             }
             perror("Send failed");

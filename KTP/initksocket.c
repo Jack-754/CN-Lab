@@ -32,6 +32,38 @@ int incr(int cur, int mn, int mx){
     return cur;
 }
 
+void serialize_packet(packet *pkt, uint8_t *buffer) {
+    int seq_no_n = htonl(pkt->seq_no);
+    int ack_no_n = htonl(pkt->ack_no);
+    int len_n = htonl(pkt->len);
+    int flag_n = htonl(pkt->flag);
+    int window_n = htonl(pkt->window);
+
+    memcpy(buffer, &seq_no_n, sizeof(seq_no_n));
+    memcpy(buffer + 4, &ack_no_n, sizeof(ack_no_n));
+    memcpy(buffer + 8, pkt->data, MESSAGE_SIZE);  
+    memcpy(buffer + 8 + MESSAGE_SIZE, &len_n, sizeof(len_n));
+    memcpy(buffer + 12 + MESSAGE_SIZE, &flag_n, sizeof(flag_n));
+    memcpy(buffer + 16 + MESSAGE_SIZE, &window_n, sizeof(window_n));
+}
+
+void deserialize_packet(packet *pkt, uint8_t *buffer) {
+    int seq_no_n, ack_no_n, len_n, flag_n, window_n;
+
+    memcpy(&seq_no_n, buffer, sizeof(seq_no_n));
+    memcpy(&ack_no_n, buffer + 4, sizeof(ack_no_n));
+    memcpy(pkt->data, buffer + 8, MESSAGE_SIZE);  
+    memcpy(&len_n, buffer + 8 + MESSAGE_SIZE, sizeof(len_n));
+    memcpy(&flag_n, buffer + 12 + MESSAGE_SIZE, sizeof(flag_n));
+    memcpy(&window_n, buffer + 16 + MESSAGE_SIZE, sizeof(window_n));
+
+    pkt->seq_no = ntohl(seq_no_n);
+    pkt->ack_no = ntohl(ack_no_n);
+    pkt->len = ntohl(len_n);
+    pkt->flag = ntohl(flag_n);
+    pkt->window = ntohl(window_n);
+}
+
 void print_sm_table_entry(int sockfd) {
     if (sockfd < 0 || sockfd >= N || SM_table[sockfd].state == FREE) {
         printf("Socket %d is invalid or not allocated.\n", sockfd);
@@ -124,9 +156,9 @@ void * R(){
                         addr.sin_family = AF_INET;
                         addr.sin_port = htons(SM_table[i].dest_port);
                         
-                        sendto(SM_table[i].sockfd, &ack, sizeof(ack), 0, 
-                               (struct sockaddr*)&addr, sizeof(addr));
-                        
+                        uint8_t buffer[PACKET_SIZE];
+                        serialize_packet(&ack, buffer);
+                        sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
                         printf("Space available notification sent for socket %d (attempt %d)\n", i, SM_table[i].nospace);
                         SM_table[i].nospace++;  // Increment nospace counter
                     }
@@ -145,7 +177,11 @@ void * R(){
                 addr.sin_addr.s_addr=inet_addr(SM_table[i].dest_ip);
                 addr.sin_family=AF_INET;
                 addr.sin_port=htons(SM_table[i].dest_port);
-                int len=recvfrom(SM_table[i].sockfd, &tmp, sizeof(packet), 0, NULL, NULL);
+
+                uint8_t buffer[PACKET_SIZE];
+                int len=recvfrom(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, NULL, NULL);
+                printf("Packet received\n");
+                deserialize_packet(&tmp, buffer);
 
                 // DEBUGGING
                 char str[11]; // 10 characters + null terminator
@@ -169,7 +205,7 @@ void * R(){
                     }
                 }
                 if(tmp.flag&(1<<2)){
-                    printf("Received ACK for packet %d from socket %d\n", tmp.ack_no, i);
+                    printf("Received ACK for packet %d on socket %d\n", tmp.ack_no, i);
                     
                     // Handle ACK with 4th bit set (space notification)
                     if(tmp.flag & (1 << 3)) {
@@ -180,23 +216,26 @@ void * R(){
                             printf("Sending space available notification acknowdledgment for socket %d\n", i);
                             packet response;
                             response.flag = 1 << 3;  // Set only 4th bit
-                            sendto(SM_table[i].sockfd, &response, sizeof(response), 0,
-                                   (struct sockaddr*)&addr, sizeof(addr));
+                            uint8_t buffer[PACKET_SIZE];
+                            serialize_packet(&response, buffer);
+                            sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0,(struct sockaddr*)&addr, sizeof(addr));
                         }
                         continue;
-                        // Continue normal ACK processing
                     }
 
                     int expected_seq = SM_table[i].swnd.seq;
                     int ack_seq = tmp.ack_no;
 
                     int diff = (ack_seq - expected_seq + 256) % 256;
-                    if (diff < 0) {
+                    if (diff < 0 || diff>WINDOW_SIZE) {
                         // Invalid ACK, ignore
-                        printf("Invalid ACK received for packet %d from socket %d\n", tmp.ack_no, i);
+                        printf("Invalid ACK received for packet %d on socket %d\n", tmp.ack_no, i);
                         continue;
                     }
-
+                    // RESET RETRY COUNTER IF ACK IS FOR A OLDEST UNACKED PACKET
+                    if(diff>0){
+                        SM_table[i].send_retries=0;
+                    }
                     for (int j = 0; j < diff; j++) {
                         int idx = (SM_table[i].swnd.pointer + j) % WINDOW_SIZE;
                         if (SM_table[i].swnd.wndw[idx] == SENT || SM_table[i].swnd.wndw[idx] == ACKED) {
@@ -231,17 +270,32 @@ void * R(){
                 else{
                     int seq_no = tmp.seq_no;
                     int curseq = SM_table[i].rwnd.seq;
+
                     int diff = (seq_no - curseq + 256) % 256;
+
                     if (diff >= SM_table[i].rwnd.size) {
-                        printf("Packet %d out of window for socket %d\n", seq_no, i);
+                        packet ack;
+                        ack.ack_no=curseq;
+                        ack.flag=(1<<2);
+                        ack.window = SM_table[i].rwnd.size;
+                        uint8_t buffer[PACKET_SIZE];
+                        serialize_packet(&ack, buffer);
+                        sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
+                        printf("Duplicate packet %d received for socket %d\n", seq_no, i);
                         continue;
                     }
+                    
                     int idx=seqtoidx(tmp.seq_no, SM_table[i].rwnd.seq, SM_table[i].rwnd.pointer);
-                    printf("Received packet %d from socket %d\n", tmp.seq_no, i);
+                    printf("Received packet %d on socket %d\n", tmp.seq_no, i);
 
-                    print_sm_table_entry(i);
+                    if(SM_table[i].rwnd.wndw[idx]==WFREE){
+                        SM_table[i].rwnd.wndw[idx]=RECVD;
+                    }
+                    else{
+                        printf("Window slot %d is not free for socket %d\n", idx, i);
+                        continue;
+                    }
 
-                    SM_table[i].rwnd.wndw[idx]=RECVD;
                     for (int j = 0; j < tmp.len; j++) {
                         SM_table[i].recv_buffer[idx][j] = tmp.data[j];
                     }
@@ -259,16 +313,17 @@ void * R(){
                         while(SM_table[i].rwnd.wndw[SM_table[i].rwnd.pointer]==RECVD){
                             cumulative++;
                             SM_table[i].rwnd.pointer=(SM_table[i].rwnd.pointer+1)%WINDOW_SIZE;
-                            if(cumulative==WINDOW_SIZE)break;
+                            if(SM_table[i].rwnd.pointer==SM_table[i].recv_ptr)break;
                         }
                         curseq=SM_table[i].rwnd.seq=(curseq+cumulative-1)%256+1;
                     }
-                    print_sm_table_entry(i);
                     packet ack;
                     ack.ack_no=curseq;
                     ack.flag=(1<<2);
                     ack.window = SM_table[i].rwnd.size;
-                    sendto(SM_table[i].sockfd, &ack, sizeof(ack), 0, (struct sockaddr*)&addr, sizeof(addr));
+                    uint8_t buffer[PACKET_SIZE];
+                    serialize_packet(&ack, buffer);
+                    sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
                     
                 }
             }
@@ -295,12 +350,29 @@ void * S(){
                     if(SM_table[i].swnd.wndw[idx]==NOT_SENT || (SM_table[i].swnd.wndw[idx] == SENT && (curtime - SM_table[i].time_sent[idx]) >= T)){
                         if(SM_table[i].swnd.wndw[idx]==NOT_SENT){
                             if(SM_table[i].swnd.size>0) {
+                                if(idx==SM_table[i].swnd.pointer){
+                                    SM_table[i].send_retries=0;
+                                }
                                 SM_table[i].swnd.size--;
                                 SM_table[i].sent_but_not_acked++;
                             } else {
                                 continue;  // Skip if window is full
                             }
-                        } 
+                        }
+                        // ADDED CODE FOR RETRY LIMIT
+                        else if(idx==SM_table[i].swnd.pointer){
+                            SM_table[i].send_retries++;
+                            if(SM_table[i].send_retries>MAX_TRIES){
+                                printf("Max tries exceeded for socket %d, closing connection\n", i);
+                                SM_table[i].state=TO_CLOSE;
+                                V(sem1);
+                                P(sem2);
+                                continue;
+                            }
+                            else{
+                                printf("Retrying packet %d for socket %d\n", SM_table[i].swnd.seq, i);
+                            }
+                        }
                         for(int j=0; j<SM_table[i].send_buffer_msg_size[idx]; j++){
                             tmp.data[j]=SM_table[i].send_buffer[idx][j];
                         }
@@ -318,9 +390,10 @@ void * S(){
                         strncpy(str, tmp.data, 10);
                         str[10] = '\0'; // Null-terminate the string
                         printf("S idx:%d seq:%d flag:%d window:%d len:%d str:%s\n", idx, tmp.seq_no, tmp.flag, tmp.window, tmp.len, str);
-                        print_sm_table_entry(i);
 
-                        sendto(SM_table[i].sockfd, &tmp, sizeof(tmp), 0, (struct sockaddr*)&addr, sizeof(addr));
+                        uint8_t buffer[PACKET_SIZE];
+                        serialize_packet(&tmp, buffer);
+                        sendto(SM_table[i].sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr*)&addr, sizeof(addr));
                         SM_table[i].time_sent[idx] = time(NULL);  // Update next send time
                         SM_table[i].swnd.wndw[idx] = SENT;        // Mark as sent
                     }
