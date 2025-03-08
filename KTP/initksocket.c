@@ -102,7 +102,7 @@ void * R(){
     fflush(stdout);
     fd_set readfds;
     struct timeval tv;
-    tv.tv_sec=1;
+    tv.tv_sec= T/2;
     tv.tv_usec=0;
     while(1){
         FD_ZERO(&readfds);
@@ -126,7 +126,7 @@ void * R(){
         // Handle select timeout - check for nospace condition
         if(activity == 0) {
             printf("Select timeout\n");
-            tv.tv_sec = 1;    // Reinitialize timeout
+            tv.tv_sec = T/2;    // Reinitialize timeout
             tv.tv_usec = 0;
             
             P(sem_SM);
