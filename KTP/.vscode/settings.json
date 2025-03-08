@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "errno.h": "c"
+        "errno.h": "c",
+        "signal.h": "c",
+        "select.h": "c"
     }
 }

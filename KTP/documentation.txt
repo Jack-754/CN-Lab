@@ -142,9 +142,18 @@ struct packet{
 - G(): Garbage collector thread that frees resources of terminated processes
 - main(): Initializes the KTP socket system and services socket operations
 
+Total packets to send: 215
+
 ## Performance Analysis
-0.05 386
-0.15 413
-0.3  640
-0.4  835
-0.5  987
+|Packet Loss Probability (p) |Total Transmissions  |Avg Transmissions per Packet|
+|----------------------------|---------------------|---------------------------|
+| 0.05                       | 322                 | 1.50                      |
+| 0.10                       | 332                 | 1.54                      |
+| 0.15                       | 416                 | 1.93                      |
+| 0.20                       | 422                 | 1.96                      |
+| 0.25                       | 590                 | 2.74                      |
+| 0.30                       | 640                 | 2.98                      |
+| 0.35                       | 659                 | 3.06                      |
+| 0.40                       | 871                 | 4.05                      |
+| 0.45                       | 884                 | 4.11                      |
+| 0.50                       | 1178                | 5.48                      |

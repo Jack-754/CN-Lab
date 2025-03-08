@@ -28,7 +28,7 @@ void debug_mode(){
 }
 
 int main() {
-    debug_mode();
+    //debug_mode();
     // Create socket
     int sockfd = k_socket(AF_INET, SOCK_KTP, 0);
     if (sockfd < 0) {

@@ -1,7 +1,7 @@
 DEBUG MODE ON
-Socket created at 1
+Socket created at 3
 Socket created successfully
-Socket 1 bounded.
+Socket 3 bounded.
 Socket bound successfully
 Waiting for messages...
 woke up
