@@ -6,9 +6,9 @@
 #include <unistd.h>
 
 #define RECEIVER_IP "127.0.0.1"
-#define RECEIVER_PORT 8081
+#define RECEIVER_PORT 8083
 #define SENDER_IP "127.0.0.1"
-#define SENDER_PORT 8080
+#define SENDER_PORT 8082
 #define CHUNK_SIZE 512
 
 void debug_mode(){

@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <sys/select.h>
 
+// Free all resources allocated to the program
 void free_resources(){
     shmdt(SM_table);
     semctl(sem_SM, 0, IPC_RMID);
@@ -11,27 +12,32 @@ void free_resources(){
     shmctl(shmid_SM, IPC_RMID, NULL);
 }
 
+// Signal handler to free resources and exit on receiving SIGINT
 void sig_handler(int sig){
     free_resources();
     exit(0);
 }
 
+// Return the maximum of two integers
 int max(int a, int b){
     return (a>b)?a:b;
 }
 
+// Convert sequence number to index in the window
 int seqtoidx(int seq, int curseq, int pointer){
     int tmp=seq-curseq;
     if(tmp<0)tmp+=256;
     return (pointer+tmp)%WINDOW_SIZE;
 }
 
+// Increment a value and wrap around if it exceeds a maximum
 int incr(int cur, int mn, int mx){
     cur++;
     if(cur>mx)cur=mn;
     return cur;
 }
 
+// Serialize a packet into a buffer for network transmission
 void serialize_packet(packet *pkt, uint8_t *buffer) {
     int seq_no_n = htonl(pkt->seq_no);
     int ack_no_n = htonl(pkt->ack_no);
@@ -47,6 +53,7 @@ void serialize_packet(packet *pkt, uint8_t *buffer) {
     memcpy(buffer + 16 + MESSAGE_SIZE, &window_n, sizeof(window_n));
 }
 
+// Deserialize a buffer into a packet for local processing
 void deserialize_packet(packet *pkt, uint8_t *buffer) {
     int seq_no_n, ack_no_n, len_n, flag_n, window_n;
 
@@ -64,6 +71,7 @@ void deserialize_packet(packet *pkt, uint8_t *buffer) {
     pkt->window = ntohl(window_n);
 }
 
+// Print the state of a socket in the SM table, only for debugging purposes
 void print_sm_table_entry(int sockfd) {
     if (sockfd < 0 || sockfd >= N || SM_table[sockfd].state == FREE) {
         printf("Socket %d is invalid or not allocated.\n", sockfd);
@@ -96,7 +104,7 @@ void print_sm_table_entry(int sockfd) {
     printf("************************************************\n\n");
 }
 
-
+// Receiver thread that listens for incoming packets and processes them
 void * R(){
     printf("Started R thread\n");
     fflush(stdout);
@@ -332,6 +340,7 @@ void * R(){
     }
 }
 
+// Sender thread that sends packets to the receiver
 void * S(){
     printf("Started S thread\n");
     fflush(stdout);
@@ -405,6 +414,7 @@ void * S(){
     }
 }
 
+// Garbage collector thread that closes sockets that are no longer needed
 void * G(){
     printf("Started G thread\n");
     fflush(stdout);
@@ -434,6 +444,7 @@ void * G(){
     }
 }
 
+// Main function that initializes the program
 int main(){
     printf("Starting initksocket.c main\n");
     srand(time(0));

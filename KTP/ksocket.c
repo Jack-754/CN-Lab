@@ -68,6 +68,7 @@ int k_socket(int domain, int type, int protocol){
     sockfd=free_slot();
     if(sockfd==-1){
         errno=ENOSPACE;
+        perror("No free slot in shared memory table.\n");
         return -1;
     }
 
@@ -112,7 +113,9 @@ int k_bind(char src_ip[], uint16_t src_port, char dest_ip[], uint16_t dest_port)
 
     // error checking for socket created by this process
     if(sockfd==-1 || SM_table[sockfd].state!=CREATED){
+        errno = EINVALIDSOCK;
         perror("No socket created by current process.\n");
+        V(sem_SM);
         return -1;
     }
 
@@ -138,6 +141,7 @@ int k_bind(char src_ip[], uint16_t src_port, char dest_ip[], uint16_t dest_port)
 ssize_t k_sendto(int sockfd, void *buf, size_t len, int flags, struct sockaddr *dest_addr, socklen_t *addrlen){
     // checking for message size correctness
     if(len > MESSAGE_SIZE || len < 0){
+        errno = EINVALIDMESSAGE;
         perror("Message size specified by len attribute not in correct range.\n");
         exit(1);
     }
@@ -150,6 +154,7 @@ ssize_t k_sendto(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 
     // checking if the socket file descriptor is valid and bound
     if(sockfd >= N || sockfd < 0 || SM_table[sockfd].state != BOUND){
+        errno = EINVALIDSOCK;
         perror("Wrong sockfd.\n");
         V(sem_SM);
         return -1;
@@ -158,7 +163,8 @@ ssize_t k_sendto(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
     // checking if the destination address matches the bound address
     struct sockaddr_in addr = *((struct sockaddr_in*)dest_addr);
     if(addr.sin_addr.s_addr != inet_addr(SM_table[sockfd].dest_ip) || addr.sin_port != htons(SM_table[sockfd].dest_port)){
-        errno = ENOTBOUND;
+        errno = EINVALIDADDRESS;
+        perror("Destination address does not match the bound address.\n");
         V(sem_SM);
         return -1;
     }
@@ -166,6 +172,7 @@ ssize_t k_sendto(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
     // checking if there is space in the send buffer
     if(SM_table[sockfd].send_msg_count == WINDOW_SIZE){
         errno = ENOSPACE;
+        perror("Send buffer is full.\n");
         V(sem_SM);
         return -1;
     }
@@ -204,12 +211,14 @@ ssize_t k_recvfrom(int sockfd, void *buf, int flags, struct sockaddr *src_addr, 
     // Check if the socket file descriptor is valid and bound
     if(sockfd >= N || sockfd < 0 || SM_table[sockfd].state != BOUND){
         perror("Wrong sockfd.\n");
+        errno = EINVALIDSOCK;
         V(sem_SM);
         return -1;
     }
 
     // Check if there are any messages in the receive buffer
     if(SM_table[sockfd].recv_msg_count == 0 || SM_table[sockfd].rwnd.wndw[SM_table[sockfd].recv_ptr] != RECVD){
+        perror("No message in receive buffer.\n");
         errno = ENOMESSAGE;
         V(sem_SM);
         return -1;
@@ -259,7 +268,9 @@ int k_close(int sockfd){
     init();
     P(sem_SM);
     if(sockfd>=N || sockfd<0 || SM_table[sockfd].state==FREE){
+        errno = EINVALIDSOCK;
         perror("Socket can't be closed.\n");
+        V(sem_SM);
         return -1;
     }
     while(1){
