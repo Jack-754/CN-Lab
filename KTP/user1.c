@@ -50,7 +50,7 @@ int main() {
                       (struct sockaddr*)&dest_addr, &addrlen) < 0) {
             if(errno==ENOSPACE){
                 printf("No space in buffer\n");
-                sleep(1);
+                sleep(3);
                 continue;
             }
             perror("Send failed");

@@ -13,17 +13,20 @@
 #include <signal.h>
 #include <errno.h>
 
-#define p 0.05
-#define T 5
-#define N 25
-#define SOCK_KTP 3
-#define WINDOW_SIZE 10
-#define MESSAGE_SIZE 512
-#define PACKET_SIZE (MESSAGE_SIZE + 5 * sizeof(int))
-#define MAX_TRIES 20
-#define ENOSPACE -1
-#define ENOTBOUND -2
-#define ENOMESSAGE -3
+#define p 0.05                  // probability of packet loss
+#define T 5                     // timeout value
+#define N 25                    // number of sequence numbers
+#define SOCK_KTP 3              // number of sockets
+#define WINDOW_SIZE 10          // window size
+#define MESSAGE_SIZE 512        // message size
+#define PACKET_SIZE (MESSAGE_SIZE + 5 * sizeof(int)) // packet size
+#define MAX_TRIES 20            // maximum number of retries
+#define ENOSPACE -1             // No space in buffer error
+#define ENOTBOUND -2            // Socket not bound error
+#define ENOMESSAGE -3           // No message error
+#define EINVALIDSOCK -4         // Invalid socket error
+#define EINVALIDADDRESS -5      // Invalid address error
+#define EINVALIDMESSAGE -6      // Invalid message error
 
 typedef enum state{
     FREE,ALLOTED,TO_CREATE,CREATED,TO_BIND,BOUND,TO_CLOSE

@@ -1,0 +1,159 @@
+# KTP Socket Implementation Function Summary
+
+## ksocket.h Structures
+
+// states possible for a socket
+enum state{
+    FREE,ALLOTED,TO_CREATE,CREATED,TO_BIND,BOUND,TO_CLOSE
+}STATE;
+
+// states possible for a window slot
+enum window_state{
+    WFREE, SENT, ACKED, NOT_SENT, RECVD
+}window_state;
+
+struct window {
+    window_state wndw[WINDOW_SIZE]; 
+    // state of the message corresponding to the currently mapped sequence number, FREE if no message is stored, SENT if message is sent but not acknowledged, ACKED if message is acknowledged, NOT_SENT if message is not sent, RECVD if message is received
+
+    int size;                       
+    // for send window (swnd), size of reciever window size available based on advertised window size (can be used to check if a message can be sent to receiver based on advertised window size), for reciever window (rwnd), number of free slots in window where no message is stored in corresponding message buffer
+
+    int pointer;                    
+    // points to the first unacknowledged sequence number in window in send window (swnd), points to the expected sequence number in reciever window (rwnd)
+
+    int seq;              
+    // sequence number for first unacknowledged message in send window and expected sequence number for first unreceived message in reciever window | all sequence numbers are in the range 1 to 256
+
+}window;
+
+struct SM{
+    STATE state;             
+    // state of the socket can be FREE (no process is using it), ALLOTED (process is has been allotted a socket), TO_CREATE (process is waiting for socket to be created), CREATED (socket is created), TO_BIND (process is waiting for socket to be bound), BOUND (socket is bound), TO_CLOSE (process is waiting for socket to be closed)
+
+    int pid;                 
+    // process id of the process using the socket
+
+    int sockfd;             
+    // socket file descriptor of the udp socket
+
+    char dest_ip[16];        
+    // destination ip address of the socket
+
+    int dest_port;          
+    // destination port number of the socket
+
+    char src_ip[16];        
+    // source ip address of the socket
+
+    int src_port;           
+    // source port number of the socket
+
+    char send_buffer[WINDOW_SIZE][MESSAGE_SIZE]; 
+    // buffer to store the messages to be sent
+
+    int send_buffer_msg_size[WINDOW_SIZE];  
+    // lenght of message stored in buffer (ith index corresponds to ith message in buffer)
+
+    int send_msg_count;     
+    // number of messages in buffer currently
+
+    int send_ptr;           
+    // pointer to first unacknowledged message in buffer
+
+    char recv_buffer[WINDOW_SIZE][MESSAGE_SIZE]; 
+    // buffer to store the messages received
+
+    int recv_buffer_msg_size[WINDOW_SIZE];        
+    // lenght of message stored in buffer (ith index corresponds to ith message in buffer)
+
+    int recv_msg_count;     
+    // number of messages in buffer currently
+
+    int recv_ptr;           
+    // pointer to first unread message in buffer
+
+    int nospace;            
+    // Flag to track if receiver had no space
+
+    int sent_but_not_acked; 
+    // Count of messages sent but not acked
+
+    int send_retries;       
+    // number of times the oldest unacked message is being retried
+
+    window swnd;            
+    // send window
+
+    window rwnd;            
+    // reciever window
+
+    time_t time_sent[WINDOW_SIZE]; 
+    // time when each message was sent
+
+}SM;
+
+// sizes of message buffer (number of messages that can be stored in buffer) is equal to size of window in swnd. this is used to keep a one to one mapping between the sequence number and the message in buffer. thus for i th message, its related inforamtion can be found in the window structure at index i (accordingly for send buffer <-> swnd and reciever buffer <-> rwnd)
+
+struct packet{
+    int seq_no;             
+    // sequence number of the message
+
+    int ack_no;             
+    // acknowledgement number of the message
+
+    char data[MESSAGE_SIZE]; 
+    // data of the message
+
+    int len;                
+    // length of the message
+
+    int flag;               
+    //bits 0: fin, 1: syn, 2: ack, 3: nospace
+
+    int window;             
+    // if an ack message, window size of the receiver is advertised through this field, otherwise not used
+
+}packet;
+
+## ksocket.c Functions
+
+- init(): Initializes shared memory and semaphores needed for KTP socket operations
+- dropMessage(): Implements a probabilistic packet drop based on parameter p (0.05)
+- k_socket(): Creates a new KTP socket and returns a socket descriptor
+- free_slot(): Finds an available slot in the socket table for a new socket
+- k_bind(): Binds a socket to specified source and destination IP addresses and ports
+- k_sendto(): Sends a message through a KTP socket, handles buffering if needed
+- k_recvfrom(): Receives a message from a KTP socket, retrieving from receive buffer
+- k_close(): Closes a KTP socket, ensuring all pending messages are sent first
+
+## initksocket.c Functions
+
+- free_resources(): Cleans up shared resources before program termination
+- sig_handler(): Signal handler for SIGINT to ensure clean program termination
+- max(): Utility function that returns maximum of two integers
+- seqtoidx(): Converts sequence number to window buffer index
+- incr(): Increments a counter in a circular range
+- serialize_packet(): Converts packet structure to network byte order for transmission
+- deserialize_packet(): Converts received network data back to packet structure
+- print_sm_table_entry(): Debugging function to print socket state information
+- R(): Receiver thread that handles incoming packets, acknowledgments, and flow control
+- S(): Sender thread that processes outgoing packets and retransmissions
+- G(): Garbage collector thread that frees resources of terminated processes
+- main(): Initializes the KTP socket system and services socket operations
+
+Total packets to send: 215
+
+## Performance Analysis
+|Packet Loss Probability (p) |Total Transmissions  |Avg Transmissions per Packet|
+|----------------------------|---------------------|---------------------------|
+| 0.05                       | 322                 | 1.50                      |
+| 0.10                       | 332                 | 1.54                      |
+| 0.15                       | 416                 | 1.93                      |
+| 0.20                       | 422                 | 1.96                      |
+| 0.25                       | 590                 | 2.74                      |
+| 0.30                       | 640                 | 2.98                      |
+| 0.35                       | 659                 | 3.06                      |
+| 0.40                       | 871                 | 4.05                      |
+| 0.45                       | 884                 | 4.11                      |
+| 0.50                       | 1178                | 5.48                      |
