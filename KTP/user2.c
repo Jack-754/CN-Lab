@@ -13,14 +13,14 @@ int main() {
     // Create socket
     int sockfd = k_socket(AF_INET, SOCK_KTP, 0);
     if (sockfd < 0) {
-        perror("Socket creation failed");
+        printf("Socket creation failed");
         exit(1);
     }
     printf("Socket created successfully\n");
 
     // Bind socket
     if (k_bind(RECEIVER_IP, RECEIVER_PORT, SENDER_IP, SENDER_PORT) < 0) {
-        perror("Bind failed");
+        printf("Bind failed");
         exit(1);
     }
     printf("Socket bound successfully\n");
@@ -53,11 +53,11 @@ int main() {
         }
         if(bytes_received<0){
             if(errno==ENOMESSAGE){
-                perror("No message in receiver window");
+                printf("No message in receiver window");
                 sleep(3);
             }
             else{
-                perror("Receive failed");
+                printf("Receive failed");
             }
             sleep(2);
             continue;
