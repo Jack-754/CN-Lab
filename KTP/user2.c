@@ -49,11 +49,11 @@ int main() {
                                     (struct sockaddr*)&
                                     src_addr, &addrlen) ;
         if(bytes_received==0){
-            continue;
+            break;
         }
         if(bytes_received<0){
-            if(errno==ENOSPACE){
-                perror("No space in receiver window");
+            if(errno==ENOMESSAGE){
+                perror("No message in receiver window");
                 sleep(3);
             }
             else{
