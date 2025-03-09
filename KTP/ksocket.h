@@ -33,6 +33,7 @@
                               // - Message at current receive pointer is not marked as RECVD
 
 #define EINVALIDSOCK -4        // Error: Invalid or unusable socket. Returned when:
+                              // - Socket type is not SOCK_KTP
                               // - Socket descriptor is out of valid range (0 to N-1)
                               // - Socket is not in correct state (e.g., not BOUND for send/recv)
                               // - No socket created by current process

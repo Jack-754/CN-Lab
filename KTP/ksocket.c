@@ -57,7 +57,7 @@ int dropMessage() {
 int k_socket(int domain, int type, int protocol){
     // checking for socket type
     if(type!=SOCK_KTP){
-        errno=EINVAL;
+        errno=EINVALIDSOCK;
         return -1;
     }
     // initialising the shared memory segments

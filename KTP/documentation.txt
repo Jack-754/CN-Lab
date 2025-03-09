@@ -12,7 +12,17 @@ enum window_state{
     WFREE, SENT, ACKED, NOT_SENT, RECVD
 }window_state;
 
-struct window {
+-------------
+struct window
+-------------
+
+// The window struct manages sliding window protocol state:
+// - Used for both send window (swnd) and receive window (rwnd)
+// - Tracks sequence numbers and message states within the window
+// - Enables reliable, ordered message delivery
+// - Supports flow control via window size management
+// - Coordinates acknowledgments between sender and receiver
+{
     window_state wndw[WINDOW_SIZE]; 
     // state of the message corresponding to the currently mapped sequence number, FREE if no message is stored, SENT if message is sent but not acknowledged, ACKED if message is acknowledged, NOT_SENT if message is not sent, RECVD if message is received
 
@@ -27,7 +37,19 @@ struct window {
 
 }window;
 
-struct SM{
+---------
+struct SM
+---------
+
+// The SM (Socket Manager) struct maintains the state and data for each KTP socket:
+// - Used as an array in shared memory to track all active sockets
+// - Each array index corresponds to a socket descriptor
+// - Stores socket state, process info, addressing details
+// - Contains send/receive buffers and window management data
+// - Accessed by both user processes and init process to coordinate socket operations
+// - Protected by semaphores to ensure thread-safe access
+// - Persists socket data across process boundaries via shared memory
+{
     STATE state;             
     // state of the socket can be FREE (no process is using it), ALLOTED (process is has been allotted a socket), TO_CREATE (process is waiting for socket to be created), CREATED (socket is created), TO_BIND (process is waiting for socket to be bound), BOUND (socket is bound), TO_CLOSE (process is waiting for socket to be closed)
 
@@ -95,7 +117,12 @@ struct SM{
 
 // sizes of message buffer (number of messages that can be stored in buffer) is equal to size of window in swnd. this is used to keep a one to one mapping between the sequence number and the message in buffer. thus for i th message, its related inforamtion can be found in the window structure at index i (accordingly for send buffer <-> swnd and reciever buffer <-> rwnd)
 
-struct packet{
+-------------
+struct packet
+-------------
+
+// The packet structure represents the format of messages exchanged between KTP sockets
+{
     int seq_no;             
     // sequence number of the message
 
@@ -115,6 +142,7 @@ struct packet{
     // if an ack message, window size of the receiver is advertised through this field, otherwise not used
 
 }packet;
+
 
 ## ksocket.c Functions
 
@@ -141,6 +169,63 @@ struct packet{
 - S(): Sender thread that processes outgoing packets and retransmissions
 - G(): Garbage collector thread that frees resources of terminated processes
 - main(): Initializes the KTP socket system and services socket operations
+
+## Error Handling
+
+KTP uses standard errno-based error handling. When functions return -1, check errno for specific error codes.
+
+### Error Codes
+
+1. ENOSPACE (-1)
+   - No space available in buffer
+   - Occurs when:
+     * No free slots in shared memory table during socket creation
+     * Send buffer is full when trying to send a message (all WINDOW_SIZE slots occupied)
+   - Set by: k_socket(), k_sendto()
+
+2. ENOTBOUND (-2)
+   - Socket not bound to specified address/port
+   - Occurs when: Destination address in k_sendto() doesn't match the bound address
+   - Set by: k_sendto()
+
+3. ENOMESSAGE (-3)
+   - No message available to receive
+   - Occurs when:
+     * Receive buffer is empty
+     * Message at current receive pointer is not marked as RECVD
+   - Set by: k_recvfrom()
+
+4. EINVALIDSOCK (-4)
+   - Invalid or unusable socket
+   - Occurs when:
+     * Socket type in k_socket is not SOCK_KTP
+     * Socket descriptor is out of valid range (0 to N-1)
+     * Socket is not in correct state (e.g., not BOUND for send/recv)
+     * No socket created by current process
+     * Attempting to close an invalid or FREE socket
+   - Set by: k_bind(), k_sendto(), k_recvfrom(), k_close()
+
+5. EINVALIDMESSAGE (-5)
+   - Invalid message parameters
+   - Occurs when:
+     * Message length exceeds MESSAGE_SIZE
+     * Message length is negative
+   - Set by: k_sendto()
+
+### Example Usage
+
+int sockfd = k_socket(AF_INET, SOCK_KTP, 0);
+if (sockfd == -1) {
+    switch (errno) {
+        case ENOSPACE:
+            printf("No space available in socket table\n");
+            break;
+        case EINVALIDSOCK:
+            printf("Invalid socket type\n");
+            break;
+        // Handle other errors as needed
+    }
+}
 
 Total packets to send: 215
 
