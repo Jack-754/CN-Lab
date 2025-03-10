@@ -1,3 +1,9 @@
+// =====================================
+// Assignment 4 Submission: KTP
+// Name: More Aayush Babasaheb
+// Roll number: 22CS30063
+// =====================================
+
 #include "ksocket.h"
 #include <stdio.h>
 #include <string.h>
@@ -53,17 +59,17 @@ int main() {
         }
         if(bytes_received<0){
             if(errno==ENOMESSAGE){
-                printf("No message in receiver window");
+                printf("No message in receiver window\n");
                 sleep(3);
             }
             else{
-                printf("Receive failed");
+                printf("Receive failed\n");
             }
             sleep(2);
             continue;
         }
         if (fwrite(buffer, 1, bytes_received, fp) != bytes_received) {
-            perror("Write to file failed");
+            perror("Write to file failed\n");
             fclose(fp);
             k_close(sockfd);
             exit(1);

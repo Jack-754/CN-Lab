@@ -1,3 +1,9 @@
+// =====================================
+// Assignment 4 Submission: KTP
+// Name: More Aayush Babasaheb
+// Roll number: 22CS30063
+// =====================================
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
