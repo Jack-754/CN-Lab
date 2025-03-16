@@ -47,13 +47,28 @@ int main(){
         close(sockfd);
         exit(0);
     }
+    printf("Connected to server\n");
+    
+    //Uncomment to test timeout after connection
+    //sleep(40);
 
     // Counter for number of tasks completed
     int count=0;
     while (1){
         // Request a new task from server
         strcpy(buf, "GET_TASK");
-        send(sockfd, buf, strlen(buf) + 1, 0);
+        if(send(sockfd, buf, strlen(buf) + 1, 0) < 0){
+            perror("Error sending task request to server");
+            close(sockfd);
+            exit(1);
+        }
+
+        // Uncomment to test repeated GET_TASK
+        // if(send(sockfd, buf, strlen(buf) + 1, 0) < 0){
+        //     perror("Error sending task request to server");
+        //     close(sockfd);
+        //     exit(1);
+        // }
         
         // Receive task from server
         int bytes_received = recv(sockfd, buf, 100, 0);
@@ -109,10 +124,18 @@ int main(){
         // Simulate processing time
         sleep(1);
         
+
+        //Uncomment to test timeout after GET_TASK
+        //sleep(40);
+        
         // Send result back to server
         sprintf(buf, "RESULT %d", result);
         printf("Sending result: %s\n", buf);
-        send(sockfd, buf, strlen(buf) + 1, 0);
+        if (send(sockfd, buf, strlen(buf) + 1, 0) < 0) {
+            perror("Error sending result to server");
+            close(sockfd);
+            exit(1);
+        }
         printf("Task completed\n");
         
         // Exit after completing 10 tasks

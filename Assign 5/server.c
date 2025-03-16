@@ -21,6 +21,7 @@
 #include <errno.h>
 
 #define MAX_TASKS 100
+#define TIMEOUT 30
 
 int sockfd, newsockfd;
 int all_tasks_fetched = 0;
@@ -102,8 +103,17 @@ void child_process(){
     int flags = fcntl(newsockfd, F_GETFL, 0);
     fcntl(newsockfd, F_SETFL, flags | O_NONBLOCK);
     int read_bytes = 0, recv_bytes = 0;
+    int last_activity = time(NULL);
     
     while (1){
+        // Check if client has timed out
+        if(time(NULL) - last_activity > TIMEOUT){
+            handle_client_closure(task_id);
+            printf("Client timed out\n");
+            close(newsockfd);
+            exit(0);
+        }
+
         // Check if we need to receive new data
         if(read_bytes==recv_bytes){
             // Attempt to receive data from client
@@ -130,6 +140,9 @@ void child_process(){
                 close(newsockfd);
                 exit(0);
             }
+
+            last_activity = time(NULL);
+            
             // Print received message
             printf("Received (recv_bytes: %d) : ", recv_bytes);
             for(int i=0; i<recv_bytes; i++){
@@ -176,6 +189,7 @@ void child_process(){
                 close(newsockfd);
                 exit(1);
             }
+            last_activity = time(NULL);
         }
         // Handle RESULT message
         else if (strncmp(buf, "RESULT", 6) == 0){
