@@ -25,23 +25,25 @@
 int sockfd, newsockfd;
 int all_tasks_fetched = 0;
 
+// Structure to store task information
 typedef struct tasks
 {
-    int client_pid;
-    int num1;
-    int num2;
-    char op;
-    int done;
-    int result;
+    int client_pid;  // Process ID of client handling this task
+    int num1;        // First operand
+    int num2;        // Second operand
+    char op;         // Operation to perform
+    int done;        // Flag indicating if task is completed
+    int result;      // Result of the operation
 } tasks;
 
+// Semaphore operation macros
 #define P(s) semop(s, &pop, 1)
 #define V(s) semop(s, &vop, 1)
 int mutex, shmid, task_count = 0;
 struct sembuf pop, vop;
 tasks *task;
 
-
+// Handler for SIGINT signal in parent process
 void sig_handler_parent(int signum)
 {
     shmdt(task);
@@ -51,6 +53,7 @@ void sig_handler_parent(int signum)
     exit(0);
 }
 
+// Handler for SIGINT signal in child process
 void sig_handler_child(int signum)
 {
     shmdt(task);
@@ -58,10 +61,12 @@ void sig_handler_child(int signum)
     exit(0);
 }
 
+// Handler to prevent zombie processes
 void sigchld_handler(int signum) {
     while (waitpid(-1, NULL, WNOHANG) > 0);
 }
 
+// Find available task slot in shared memory
 int find_task()
 {
     for (int i = 0; i < task_count; i++)
@@ -74,6 +79,7 @@ int find_task()
     return -1;
 }
 
+// Clean up when client disconnects
 void handle_client_closure(int task_id)
 {
     if (task_id != -1)
@@ -84,25 +90,33 @@ void handle_client_closure(int task_id)
     }
 }
 
+// Handle client communication and task processing
 void child_process(){
-    // child process
+    // Initialize buffers for message handling
     char buf[100], recv_buf[100];
-    close(sockfd);
-    int task_id = -1;
+    close(sockfd);  // Close parent's socket descriptor
+    int task_id = -1;  // No task assigned initially
     int curpid = getpid();
+    
+    // Set socket to non-blocking mode
     int flags = fcntl(newsockfd, F_GETFL, 0);
     fcntl(newsockfd, F_SETFL, flags | O_NONBLOCK);
     int read_bytes = 0, recv_bytes = 0;
+    
     while (1){
+        // Check if we need to receive new data
         if(read_bytes==recv_bytes){
+            // Attempt to receive data from client
             read_bytes = recv_bytes = recv(newsockfd, recv_buf, 100, 0);
             if (recv_bytes < 0){
+                // Handle non-blocking socket timeout
                 if (errno == EWOULDBLOCK){
                     printf("No message received, continuing...\n");
                     sleep(1);
                     continue;
                 }
                 else{
+                    // Handle other receive errors
                     handle_client_closure(task_id);
                     perror("recv error");
                     close(newsockfd);
@@ -110,11 +124,13 @@ void child_process(){
                 }
             }
             else if (recv_bytes == 0){
+                // Client has closed connection
                 handle_client_closure(task_id);
                 printf("Client disconnected\n");
                 close(newsockfd);
                 exit(0);
             }
+            // Print received message
             printf("Received (recv_bytes: %d) : ", recv_bytes);
             for(int i=0; i<recv_bytes; i++){
                 printf("%c", recv_buf[i]);
@@ -122,29 +138,38 @@ void child_process(){
             printf("\n");
             read_bytes = 0;
         }
+
+        // Copy received message to processing buffer
         int i = 0;
         do{
             buf[i++] = recv_buf[read_bytes];
         }while(recv_buf[read_bytes++] != '\0');
         printf("Processing message: %s\n", buf);
+
+        // Handle GET_TASK request
         if (strcmp(buf, "GET_TASK") == 0){
+            // Check if client already has a task
             if (task_id != -1)
             {
                 printf("Task already assigned to the client\n");
                 continue;
             }
-            P(mutex);
+            P(mutex);  // Enter critical section
             task_id = find_task(task, task_count);
             if (task_id == -1){
+                // No tasks available
                 strcpy(buf, "No tasks  available");
                 send(newsockfd, buf, strlen(buf) + 1, 0);
                 close(newsockfd);
                 V(mutex);
                 exit(0);
             }
+            // Assign task to client
             task[task_id].client_pid = curpid;
             sprintf(buf, "Task: %d %c %d", task[task_id].num1, task[task_id].op, task[task_id].num2);
-            V(mutex);
+            V(mutex);  // Exit critical section
+            
+            // Send task to client
             if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                 handle_client_closure(task_id);
                 printf("Error sending task to client\n");
@@ -152,16 +177,21 @@ void child_process(){
                 exit(1);
             }
         }
+        // Handle RESULT message
         else if (strncmp(buf, "RESULT", 6) == 0){
             int result;
             if (sscanf(buf, "RESULT %d", &result) == 1)
             {
-                P(mutex);
+                P(mutex);  // Enter critical section
+                // Store result and mark task as complete
                 task[task_id].result = result;
                 task[task_id].done = 1;
-                printf("Task completed by client %d\nTask : %d %c %d\nResult : %d\n", curpid, task[task_id].num1, task[task_id].op, task[task_id].num2, result);
+                printf("Task completed by client %d\nTask : %d %c %d\nResult : %d\n", 
+                       curpid, task[task_id].num1, task[task_id].op, task[task_id].num2, result);
                 task_id = -1;
                 fflush(stdout);
+
+                // If not all tasks are fetched, read next task from config file
                 if(!all_tasks_fetched){
                     char input_file_name[] = "config";
                     FILE *fp = fopen(input_file_name, "r");
@@ -170,6 +200,7 @@ void child_process(){
                         printf("Error opening input file\n");
                         exit(1);
                     }
+                    // Read and store new task
                     int num1, num2;
                     char op;
                     int chars_read = fscanf(fp, "%d %c %d", &num1, &op, &num2);
@@ -190,21 +221,24 @@ void child_process(){
                     }
                     fclose(fp);
                 }
-                V(mutex);
+                V(mutex);  // Exit critical section
             }
             else
             {
+                // Invalid result format
                 printf("Failed to extract number.\n");
                 handle_client_closure(task_id);
                 close(newsockfd);
                 exit(1);
             }
         }
+        // Handle exit request
         else if (strcmp(buf, "exit") == 0){
             handle_client_closure(task_id);
             close(newsockfd);
             exit(0);
         }
+        // Handle invalid messages
         else{
             printf("Invalid message from client: (bytes received: %d) %s\n", recv_bytes, buf);
             handle_client_closure(task_id);
@@ -226,6 +260,7 @@ int main()
         exit(1);
     }
 
+    // Create and initialize semaphore for mutual exclusion
     mutex = semget(key_mutex, 1, 0666 | IPC_CREAT);
     pop.sem_num = vop.sem_num = 0;
     pop.sem_flg = vop.sem_flg = 0;
@@ -244,6 +279,7 @@ int main()
         exit(1);
     }
 
+    // Create shared memory segment for tasks
     shmid = shmget(key_shmid, sizeof(tasks) * MAX_TASKS, 0666 | IPC_CREAT);
     if (shmid == -1)
     {
@@ -287,7 +323,7 @@ int main()
     signal(SIGINT, sig_handler_parent);
     signal(SIGCHLD, sigchld_handler);
 
-    // reading input file ------------------------------------------------------------
+    // Read initial tasks from config file
     char input_file_name[] = "config";
     FILE *fp = fopen(input_file_name, "r");
     if (fp == NULL)
@@ -324,13 +360,12 @@ int main()
     V(mutex);
     //----------------------------------------------------------------------------------
 
-    // socket setup --------------------------------------------------------------------
+    // Set socket to non-blocking mode
     int flags = fcntl(sockfd, F_GETFL, 0);
     fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
     //----------------------------------------------------------------------------------
 
-    // main loop ----------------------------------------------------------------------
-
+    // Main server loop - accept connections and fork child processes
     while (1)
     {
         clilen = sizeof(cli_addr);
