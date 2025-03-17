@@ -20,11 +20,12 @@
 #include <signal.h>
 #include <errno.h>
 
-#define MAX_TASKS 100
+#define PORT 20000
+#define MAX_TASKS 100000
 #define TIMEOUT 30
+#define OUTPUT_FILE "output.txt"
 
 int sockfd, newsockfd;
-int all_tasks_fetched = 0;
 
 // Structure to store task information
 typedef struct tasks
@@ -200,41 +201,21 @@ void child_process(){
                 // Store result and mark task as complete
                 task[task_id].result = result;
                 task[task_id].done = 1;
-                printf("Task completed by client %d\nTask : %d %c %d\nResult : %d\n", 
-                       curpid, task[task_id].num1, task[task_id].op, task[task_id].num2, result);
+
+                FILE *output_fp = fopen(OUTPUT_FILE, "a");
+                if (output_fp == NULL) {
+                    perror("Error opening output file");
+                    handle_client_closure(task_id);
+                    close(newsockfd);
+                    V(mutex);
+                    exit(1);
+                }
+                fprintf(output_fp, "Task : %d %c %d\nResult : %d\n\n", 
+                        task[task_id].num1, task[task_id].op, task[task_id].num2, result);
+                fclose(output_fp);
+
                 task_id = -1;
                 fflush(stdout);
-
-                // If not all tasks are fetched, read next task from config file
-                if(!all_tasks_fetched){
-                    char input_file_name[] = "config";
-                    FILE *fp = fopen(input_file_name, "r");
-                    if (fp == NULL)
-                    {
-                        printf("Error opening input file\n");
-                        exit(1);
-                    }
-                    // Read and store new task
-                    int num1, num2;
-                    char op;
-                    int chars_read = fscanf(fp, "%d %c %d", &num1, &op, &num2);
-                    if (chars_read < 3)
-                    {
-                        break;
-                    }
-                    task[task_count].client_pid = -1;
-                    task[task_count].num1 = num1;
-                    task[task_count].num2 = num2;
-                    task[task_count].op = op;
-                    task[task_count].done = 0;
-                    task_count++;
-
-                    if (feof(fp))
-                    {
-                        all_tasks_fetched = 1;
-                    }
-                    fclose(fp);
-                }
                 V(mutex);  // Exit critical section
             }
             else
@@ -322,11 +303,13 @@ int main()
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(20000);
+    serv_addr.sin_port = htons(PORT);
 
     if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
         perror("Unable to bind local address");
+        close(sockfd);
+        sig_handler_parent(0);
         exit(0);
     }
     listen(sockfd, 5);
@@ -343,6 +326,8 @@ int main()
     if (fp == NULL)
     {
         printf("Error opening input file\n");
+        close(sockfd);
+        sig_handler_parent(0);
         exit(1);
     }
 
@@ -366,7 +351,6 @@ int main()
 
         if (feof(fp))
         {
-            all_tasks_fetched = 1;
             break;
         }
     }
@@ -378,6 +362,15 @@ int main()
     int flags = fcntl(sockfd, F_GETFL, 0);
     fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
     //----------------------------------------------------------------------------------
+
+    printf("Results stored in output.txt\n");
+    FILE* output_fp=fopen(OUTPUT_FILE, "w");
+    if (output_fp == NULL) {
+        perror("Error creating output file\n");
+        close(sockfd);
+        exit(1);
+    }
+    fclose(fp);
 
     // Main server loop - accept connections and fork child processes
     while (1)

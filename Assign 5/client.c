@@ -20,6 +20,9 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#define PORT 20000
+#define WORK_LIMIT 10
+
 // Global socket file descriptor
 int sockfd;
 
@@ -39,7 +42,7 @@ int main(){
     // Configure server address details
     serv_addr.sin_family = AF_INET;
     inet_aton("127.0.0.1", &serv_addr.sin_addr);
-    serv_addr.sin_port = htons(20000);
+    serv_addr.sin_port = htons(PORT);
 
     // Connect to the server
     if ((connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr))) < 0){
@@ -49,8 +52,9 @@ int main(){
     }
     printf("Connected to server\n");
     
-    //Uncomment to test timeout after connection
-    //sleep(40);
+    // Uncomment to test timeout after connection
+    // printf("Sleeping to trigger client timeout.\n");
+    // sleep(40);
 
     // Counter for number of tasks completed
     int count=0;
@@ -64,6 +68,7 @@ int main(){
         }
 
         // Uncomment to test repeated GET_TASK
+        // printf("Sending repeated GET_TASK\n");
         // if(send(sockfd, buf, strlen(buf) + 1, 0) < 0){
         //     perror("Error sending task request to server");
         //     close(sockfd);
@@ -125,8 +130,9 @@ int main(){
         sleep(1);
         
 
-        //Uncomment to test timeout after GET_TASK
-        //sleep(40);
+        // Uncomment to test timeout after GET_TASK
+        // printf("Sleeping to trigger client timeout.\n");
+        // sleep(40);
         
         // Send result back to server
         sprintf(buf, "RESULT %d", result);
@@ -140,10 +146,10 @@ int main(){
         
         // Exit after completing 10 tasks
         count++;
-        if(count==10){
+        if(count>=WORK_LIMIT){
             strcpy(buf, "exit");
             send(sockfd, buf, strlen(buf) + 1, 0);
-            printf("Exiting\n");
+            printf("Completed WORK_LIMIT (%d) number of tasks. Exiting...\n", WORK_LIMIT);
             close(sockfd);
             exit(0);
         }
