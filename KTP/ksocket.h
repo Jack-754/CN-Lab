@@ -1,3 +1,9 @@
+// =====================================
+// Assignment 4 Submission: KTP
+// Name: More Aayush Babasaheb
+// Roll number: 22CS30063
+// =====================================
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,12 +27,27 @@
 #define MESSAGE_SIZE 512        // message size
 #define PACKET_SIZE (MESSAGE_SIZE + 5 * sizeof(int)) // packet size
 #define MAX_TRIES 20            // maximum number of retries
-#define ENOSPACE -1             // No space in buffer error
-#define ENOTBOUND -2            // Socket not bound error
-#define ENOMESSAGE -3           // No message error
-#define EINVALIDSOCK -4         // Invalid socket error
-#define EINVALIDADDRESS -5      // Invalid address error
-#define EINVALIDMESSAGE -6      // Invalid message error
+
+#define ENOSPACE -1             // Error: No space available in buffer. Returned when:
+                               // - No free slots in shared memory table during socket creation
+                               // - Send buffer is full when trying to send a message (all WINDOW_SIZE slots occupied)
+
+#define ENOTBOUND -2            // Error: Socket not bound to address/port which has been specified in input of k_sendto().
+
+#define ENOMESSAGE -3          // Error: No message available to receive. Returned when:
+                              // - Receive buffer is empty
+                              // - Message at current receive pointer is not marked as RECVD
+
+#define EINVALIDSOCK -4        // Error: Invalid or unusable socket. Returned when:
+                              // - Socket type is not SOCK_KTP
+                              // - Socket descriptor is out of valid range (0 to N-1)
+                              // - Socket is not in correct state (e.g., not BOUND for send/recv)
+                              // - No socket created by current process
+                              // - Attempting to close an invalid or FREE socket
+
+#define EINVALIDMESSAGE -5     // Error: Invalid message parameters. Returned when:
+                              // - Message length exceeds MESSAGE_SIZE
+                              // - Message length is negative
 
 typedef enum state{
     FREE,ALLOTED,TO_CREATE,CREATED,TO_BIND,BOUND,TO_CLOSE
