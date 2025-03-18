@@ -1,0 +1,8 @@
+@@@EMAIL@@@
+SENDER: bob@example.com
+DATE: (19-03-2025)
+DATA: DATA
+how 
+are 
+you.
+
