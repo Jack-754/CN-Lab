@@ -35,7 +35,6 @@ void discard_line() {
 
 
 void safe_recv_and_print() {
-    char buf[MAXSIZE];
     int total_received = 0;
 
     while (total_received < MAXSIZE - 1) {
@@ -261,6 +260,11 @@ void QUIT(){
 
 
 int main(int argc, char *argv[]){
+
+    if(argc<3){
+        printf("run as ./client $(server ip address) $(server port)");
+        exit(1);
+    }
 
     char * serverip = strdup(argv[1]);
     int serverport = atoi(argv[2]);
