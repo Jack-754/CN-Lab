@@ -33,6 +33,37 @@ void discard_line() {
     while ((c = getchar()) != '\n' && c != EOF); // Consume remaining characters
 }
 
+
+void safe_recv_and_print() {
+    char buf[MAXSIZE];
+    int total_received = 0;
+
+    while (total_received < MAXSIZE - 1) {
+        int bytes_received = recv(sockfd, buf + total_received, MAXSIZE - total_received - 1, 0);
+        if (bytes_received < 0) {
+            perror("Error receiving from server");
+            close(sockfd);
+            exit(1);
+        } else if (bytes_received == 0) {
+            printf("Server disconnected\n");
+            close(sockfd);
+            exit(1);
+        }
+
+        // Check if null terminator is received
+        if (memchr(buf+total_received, '\0', bytes_received) != NULL) {
+            total_received += bytes_received;
+            break;
+        }
+        total_received += bytes_received;
+    }
+
+    // Ensure buffer is null-terminated
+    buf[total_received] = '\0';
+
+    printf("%s\n", buf);
+}
+
 void HELO(){
     char clientid[100];
     scanf("%s", clientid);
@@ -42,18 +73,21 @@ void HELO(){
         close(sockfd);
         exit(1);
     }
-    int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
-    if(bytes_received<0){
-        perror("Error receiving from server\n");
-        close(sockfd);
-        exit(0);
-    }
-    else if(bytes_received==0){
-        printf("Server disconnected\n");
-        close(sockfd);
-        exit(0);
-    }
-    printf("%s\n", buf);
+
+    safe_recv_and_print();
+
+    // int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
+    // if(bytes_received<0){
+    //     perror("Error receiving from server\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // else if(bytes_received==0){
+    //     printf("Server disconnected\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // printf("%s\n", buf);
 }
 
 void MAIL_FROM(){
@@ -65,18 +99,21 @@ void MAIL_FROM(){
         close(sockfd);
         exit(1);
     }
-    int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
-    if(bytes_received<0){
-        perror("Error receiving from server\n");
-        close(sockfd);
-        exit(0);
-    }
-    else if(bytes_received==0){
-        printf("Server disconnected\n");
-        close(sockfd);
-        exit(0);
-    }
-    printf("%s\n", buf);
+
+    safe_recv_and_print();
+
+    // int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
+    // if(bytes_received<0){
+    //     perror("Error receiving from server\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // else if(bytes_received==0){
+    //     printf("Server disconnected\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // printf("%s\n", buf);
 }
 
 void RCPT_TO(){
@@ -88,18 +125,21 @@ void RCPT_TO(){
         close(sockfd);
         exit(1);
     }
-    int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
-    if(bytes_received<0){
-        perror("Error receiving from server\n");
-        close(sockfd);
-        exit(0);
-    }
-    else if(bytes_received==0){
-        printf("Server disconnected\n");
-        close(sockfd);
-        exit(0);
-    }
-    printf("%s\n", buf);
+
+    safe_recv_and_print();
+
+    // int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
+    // if(bytes_received<0){
+    //     perror("Error receiving from server\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // else if(bytes_received==0){
+    //     printf("Server disconnected\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // printf("%s\n", buf);
 }
 
 void DATA(){
@@ -123,18 +163,21 @@ void DATA(){
         close(sockfd);
         exit(1);
     }
-    int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
-    if(bytes_received<0){
-        perror("Error receiving from server\n");
-        close(sockfd);
-        exit(0);
-    }
-    else if(bytes_received==0){
-        printf("Server disconnected\n");
-        close(sockfd);
-        exit(0);
-    }
-    printf("%s\n", buf);
+
+    safe_recv_and_print();
+
+    // int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
+    // if(bytes_received<0){
+    //     perror("Error receiving from server\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // else if(bytes_received==0){
+    //     printf("Server disconnected\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // printf("%s\n", buf);
 }
 
 void LIST(){
@@ -146,18 +189,21 @@ void LIST(){
         close(sockfd);
         exit(1);
     }
-    int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
-    if(bytes_received<0){
-        perror("Error receiving from server\n");
-        close(sockfd);
-        exit(0);
-    }
-    else if(bytes_received==0){
-        printf("Server disconnected\n");
-        close(sockfd);
-        exit(0);
-    }
-    printf("%s\n", buf);
+
+    safe_recv_and_print();
+
+    // int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
+    // if(bytes_received<0){
+    //     perror("Error receiving from server\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // else if(bytes_received==0){
+    //     printf("Server disconnected\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // printf("%s\n", buf);
 }
 
 void GET_MAIL(){
@@ -170,18 +216,21 @@ void GET_MAIL(){
         close(sockfd);
         exit(1);
     }
-    int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
-    if(bytes_received<0){
-        perror("Error receiving from server\n");
-        close(sockfd);
-        exit(0);
-    }
-    else if(bytes_received==0){
-        printf("Server disconnected\n");
-        close(sockfd);
-        exit(0);
-    }
-    printf("%s\n", buf);
+
+    safe_recv_and_print();
+
+    // int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
+    // if(bytes_received<0){
+    //     perror("Error receiving from server\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // else if(bytes_received==0){
+    //     printf("Server disconnected\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // printf("%s\n", buf);
 }
 
 void QUIT(){
@@ -191,19 +240,22 @@ void QUIT(){
         close(sockfd);
         exit(1);
     }
-    int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
-    if(bytes_received<0){
-        perror("Error receiving from server\n");
-        close(sockfd);
-        exit(0);
-    }
-    else if(bytes_received==0){
-        printf("Server disconnected\n");
-        close(sockfd);
-        exit(0);
-    }
-    printf("%s\n", buf);
-    exit(0);
+
+    safe_recv_and_print();
+
+    // int bytes_received = recv(sockfd, buf, MAXSIZE, 0);
+    // if(bytes_received<0){
+    //     perror("Error receiving from server\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // else if(bytes_received==0){
+    //     printf("Server disconnected\n");
+    //     close(sockfd);
+    //     exit(0);
+    // }
+    // printf("%s\n", buf);
+    // exit(0);
 }
 
 

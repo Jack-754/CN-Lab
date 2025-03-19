@@ -1,0 +1,22 @@
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU

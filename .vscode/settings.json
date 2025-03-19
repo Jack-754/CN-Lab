@@ -5,6 +5,7 @@
         "socket.h": "c",
         "stdio.h": "c",
         "ksocket.h": "c",
-        "k_socket.h": "c"
+        "k_socket.h": "c",
+        "stdlib.h": "c"
     }
 }

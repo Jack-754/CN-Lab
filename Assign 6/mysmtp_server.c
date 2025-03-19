@@ -57,6 +57,15 @@ int starts_with(char *str, char *prefix) {
     return strncmp(str, prefix, strlen(prefix)) == 0;
 }
 
+void send_server_error(){
+    sprintf(buf, "500 SERVER ERROR");
+    if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
+        printf("Error sending reply to client\n");
+        close(newsockfd);
+        exit(1);
+    }
+}
+
 // Function to get the current date and time as a string
 void get_current_date(char *buffer, size_t size) {
     time_t t = time(NULL);
@@ -66,31 +75,35 @@ void get_current_date(char *buffer, size_t size) {
 }
 
 // Function to add an email entry to the file
-void add_email(const char *sender, const char *recipient, const char *data) {
+int add_email(const char *sender, const char *recipient, const char *data) {
     FILE *file = fopen(recipient, "a");
     if (!file) {
+        send_server_error();
         perror("Error opening file");
-        return;
+        return 0;
     }
 
     char date[25];
     get_current_date(date, sizeof(date));
 
-    fprintf(file, "%s\nSENDER: %s\nDATE: %s\nDATA: %s\n", DELIMITER, sender, date, data);
+    fprintf(file, "%s\nSENDER: %s\nDATE: %s\nDATA: %s", DELIMITER, sender, date, data+4);
     fclose(file);
+    return 1;
 }
 
 // Function to list email entries with sender, date, and index
-void list_emails(const char *recipient) {
+void list_emails(const char *recipient){
     FILE *file = fopen(recipient, "r");
     if (!file) {
+        send_server_error();
         perror("Error opening file");
         return;
     }
 
-    char sender[100], date[25];
+    char sender[100], date[25], temp[MAXSIZE], line[MAXSIZE];
     int index = 0;
     int found = 0;
+    strcpy(temp, "200 OK\n");
 
     while (fgets(buf, sizeof(buf), file)) {
         if (strncmp(buf, DELIMITER, strlen(DELIMITER)) == 0) {
@@ -102,12 +115,20 @@ void list_emails(const char *recipient) {
         } 
         else if (strncmp(buf, "DATE:", 5) == 0) {
             sscanf(buf, "DATE: %s", date);
-            printf("%3d Email from %s %s\n", index, sender, date);
+            sprintf(line, "%3d Email from %s %s\n", index, sender, date);
+            strcat(temp, line);
         }
     }
 
     if (!found) {
-        printf("No emails found.\n");
+        strcat(temp, "No emails found");
+    }
+
+    if (send(newsockfd, temp, strlen(temp) + 1, 0) < 0){
+        printf("Error sending reply to client\n");
+        close(newsockfd);
+        fclose(file);
+        exit(1);
     }
 
     fclose(file);
@@ -116,11 +137,12 @@ void list_emails(const char *recipient) {
 void get_email_by_index(const char *filename, int target_index) {
     FILE *file = fopen(filename, "r");
     if (!file) {
+        send_server_error();
         perror("Error opening file");
         return;
     }
 
-    char line[MAXSIZE];
+    char line[2*MAXSIZE];
     char sender[100], date[25];
     int index = 0;
     int found = 0;
@@ -128,38 +150,54 @@ void get_email_by_index(const char *filename, int target_index) {
 
     buf[0] = '\0';  // Initialize data buffer
 
+    if(target_index<=0){
+        printf("Invalid index: %d", target_index);
+        sprintf(buf, "403 Invalid index requested");
+        if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
+            printf("Error sending reply to client\n");
+            close(newsockfd);
+            fclose(file);
+            exit(1);
+        }
+    }
+
     while (fgets(line, sizeof(line), file)) {
         if (strncmp(line, DELIMITER, strlen(DELIMITER)) == 0) {
-            if (index == target_index) {
-                printf("Sender: %s\nDate: %s\nData:\n%s\n", sender, date, buf);
-                found = 1;
+            if (found){
                 break;
             }
             index++;
+            if(index==target_index)found=1;
             reading_data = 0;
             buf[0] = '\0';  // Reset data buffer for next email
-        } else if (index == target_index - 1) {
+        } else if (index == target_index) {
             if (strncmp(line, "SENDER:", 7) == 0) {
-                sscanf(line, "SENDER: %[^\n]", sender);
+                sscanf(line, "SENDER: %s", sender);
             } else if (strncmp(line, "DATE:", 5) == 0) {
-                sscanf(line, "DATE: %[^\n]", date);
+                sscanf(line, "DATE: %s", date);
             } else if (strncmp(line, "DATA:", 5) == 0) {
                 reading_data = 1;
                 snprintf(buf, sizeof(buf), "%s", line + 5);
             } else if (reading_data) {
-                strncat(buf, line, sizeof(buf) - strlen(buf) - 1);
+                strcat(buf, line);
             }
         }
     }
 
     // Print the last email if it was found
-    if (!found && index == target_index - 1) {
-        printf("Sender: %s\nDate: %s\nData:\n%s\n", sender, date, buf);
-        found = 1;
+    if (found) {
+        sprintf(line, "200 OK\nSender: %s\nDate: %s\nData:\n%s\n", sender, date, buf);
     }
 
-    if (!found) {
-        printf("Email with index %d not found.\n", target_index);
+    if(!found){
+        printf("Invalid index: %d", target_index);
+        sprintf(line, "401 NOT FOUND");
+    }
+
+    if (send(newsockfd, line, strlen(line) + 1, 0) < 0){
+        printf("Error sending reply to client\n");
+        close(newsockfd);
+        exit(1);
     }
 
     fclose(file);
@@ -265,14 +303,17 @@ int RCPT_TO(char r_email[]){
 int DATA(char s_email[], char r_email[]){
     char temp[100+strlen(folder_name)];
     sprintf(temp, "%s/%s.txt", folder_name, r_email);
-    add_email(s_email, temp, buf);
-    sprintf(buf, "200 OK");
-    if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
-        printf("Error sending reply to client\n");
-        close(newsockfd);
-        exit(1);
+    if(add_email(s_email, temp, buf)){
+        printf("DATA received, message stored\n");
+        sprintf(buf, "200 Message stored successfully");
+        if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
+            printf("Error sending reply to client\n");
+            close(newsockfd);
+            exit(1);
+        }
+        return 1;
     }
-    return 1;
+    return 0;
 }
 
 void LIST(){
@@ -280,6 +321,7 @@ void LIST(){
     if (sscanf(buf, "LIST %s", r_email) == 1){
         printf("%s\n", buf);
 
+        // to replace with faster code
         sprintf(buf, "%s/%s.txt", folder_name, r_email);
         FILE *file=fopen(buf, "r");
         if(file==NULL){
@@ -293,17 +335,10 @@ void LIST(){
         }
         fclose(file);
 
-         // to complete
+        
         char temp[100+strlen(folder_name)];
         sprintf(temp, "%s/%s.txt", folder_name, r_email);
         list_emails(temp);
-
-        sprintf(buf, "200 OK");
-        if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
-            printf("Error sending reply to client\n");
-            close(newsockfd);
-            exit(1);
-        }
         
     } 
     else{
@@ -323,6 +358,7 @@ void GET_MAIL(){
     if (sscanf(buf, "GET_MAIL %s %d", r_email, &index) >0){
         printf("%s\n", buf);
 
+        // to replace with faster code
         sprintf(buf, "%s/%s.txt", folder_name, r_email);
         FILE *file=fopen(buf, "r");
         if(file==NULL){
@@ -336,17 +372,10 @@ void GET_MAIL(){
         }
         fclose(file);
 
-        // to complete
+        
         char temp[100+strlen(folder_name)];
         sprintf(temp, "%s/%s.txt", folder_name, r_email);
         get_email_by_index(temp, index);
-
-        sprintf(buf, "200 OK");
-        if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
-            printf("Error sending reply to client\n");
-            close(newsockfd);
-            exit(1);
-        }
         
     } 
     else{
