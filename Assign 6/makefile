@@ -16,3 +16,4 @@ run_server:
 
 clean:
 	rm -f client server
+	rm -rf mailbox

@@ -235,14 +235,16 @@ void get_email_by_index(const char *filename, int target_index, int userid) {
             reading_data = 0;
             buf[0] = '\0';  // Reset data buffer for next email
         } else if (index == target_index) {
-            if (strncmp(line, "SENDER:", 7) == 0) {
-                sscanf(line, "SENDER: %s", sender);
-            } else if (strncmp(line, "DATE:", 5) == 0) {
-                sscanf(line, "DATE: %s", date);
-            } else if (strncmp(line, "DATA:", 5) == 0) {
-                reading_data = 1;
-                snprintf(buf, sizeof(buf), "%s", line + 5);
-            } else if (reading_data) {
+            if(!reading_data){
+                if (strncmp(line, "SENDER:", 7) == 0) {
+                    sscanf(line, "SENDER: %s", sender);
+                } else if (strncmp(line, "DATE:", 5) == 0) {
+                    sscanf(line, "DATE: %s", date);
+                } else if (strncmp(line, "DATA:", 5) == 0) {
+                    reading_data = 1;
+                }
+            } 
+            else if (reading_data) {
                 strcat(buf, line);
             }
         }
@@ -250,7 +252,7 @@ void get_email_by_index(const char *filename, int target_index, int userid) {
 
     // Print the last email if it was found
     if (found) {
-        sprintf(line, "200 OK\nSender: %s\nDate: %s\nData: %s", sender, date, buf);
+        sprintf(line, "200 OK\nSender: %s\nDate: %s\nData:\n%s", sender, date, buf);
     }
 
     if(!found){
