@@ -1,0 +1,9 @@
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+how are you
+good to see 
+you are well
+?

@@ -113,7 +113,7 @@ int add_email(const char *sender, const char *recipient, const char *data, int u
     char date[25];
     get_current_date(date, sizeof(date));
 
-    fprintf(file, "%s\nSENDER: %s\nDATE: %s\nDATA: %s", DELIMITER, sender, date, data+4);
+    fprintf(file, "%s\nSENDER: %s\nDATE: %s\nDATA:%s", DELIMITER, sender, date, data+4);
     fclose(file);
     V(users[userid].mutex);
     return 1;
@@ -185,7 +185,7 @@ void get_email_by_index(const char *filename, int target_index, int userid) {
     buf[0] = '\0';  // Initialize data buffer
 
     if(target_index<=0){
-        printf("Invalid index: %d", target_index);
+        printf("Invalid index: %d\n", target_index);
         sprintf(buf, "403 Invalid index requested");
         if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
             printf("Error sending reply to client\n");
@@ -194,6 +194,8 @@ void get_email_by_index(const char *filename, int target_index, int userid) {
             V(users[userid].mutex);
             exit(1);
         }
+        V(users[userid].mutex);
+        return;
     }
 
     while (fgets(line, sizeof(line), file)) {
@@ -221,11 +223,11 @@ void get_email_by_index(const char *filename, int target_index, int userid) {
 
     // Print the last email if it was found
     if (found) {
-        sprintf(line, "200 OK\nSender: %s\nDate: %s\nData:\n%s\n", sender, date, buf);
+        sprintf(line, "200 OK\nSender: %s\nDate: %s\nData: %s", sender, date, buf);
     }
 
     if(!found){
-        printf("Invalid index: %d", target_index);
+        printf("Invalid index: %d\n", target_index);
         sprintf(line, "401 NOT FOUND");
     }
 
@@ -252,7 +254,7 @@ int HELO(char clientid[]){
         return 1;
     } 
     else{
-        printf("Invalid format: %s", buf);
+        printf("Invalid format: %s\n", buf);
         sprintf(buf, "400 ERR");
         if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
             printf("Error sending reply to client\n");
@@ -287,7 +289,7 @@ int MAIL_FROM(char s_email[]){
         return 1;
     } 
     else{
-        printf("Invalid format: %s", buf);
+        printf("Invalid format: %s\n", buf);
         sprintf(buf, "400 ERR");
         if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
             printf("Error sending reply to client\n");
@@ -373,7 +375,7 @@ void LIST(){
         
     } 
     else{
-        printf("Invalid format: %s", buf);
+        printf("Invalid format: %s\n", buf);
         sprintf(buf, "400 ERR");
         if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
             printf("Error sending reply to client\n");
@@ -407,7 +409,7 @@ void GET_MAIL(){
         
     } 
     else{
-        printf("Invalid format: %s", buf);
+        printf("Invalid format: %s\n", buf);
         sprintf(buf, "400 ERR");
         if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
             printf("Error sending reply to client\n");
@@ -613,7 +615,7 @@ void child_process(){
             QUIT();
         }
         else{
-            printf("INVALID MSG RECEIVED from client: %s", client_ip);
+            printf("INVALID MSG RECEIVED from client: %s\n", client_ip);
             sprintf(buf, "400 ERR");
             if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                 printf("Error sending reply to client\n");

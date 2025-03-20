@@ -143,19 +143,23 @@ void RCPT_TO(){
 
 void DATA(){
     printf("Enter your message (end with a single dot'.'):\n");
-    int len=4;
-    buf[0]='D';
-    buf[1]='A';
-    buf[2]='T';
-    buf[3]='A';
+    char line[MAXSIZE];
+    
     while(1){
-        scanf("%c", &buf[len]);
-        if(buf[len]=='.' && buf[len-1]=='\n'){
-            buf[len]='\0';
+        if (fgets(line, sizeof(line), stdin) == NULL) {
+            perror("Error reading input");
             break;
         }
-        len++;
+
+        // Check for termination line ".\n"
+        if (strcmp(line, ".\n") == 0) {
+            break;
+        }
+
+        // Append the line to the buffer
+        strcat(buf, line);
     }
+
     printf("Reading complete\n");
     if(send(sockfd, buf, strlen(buf) + 1, 0) < 0){
         perror("Error sending request (DATA) to server");
@@ -254,7 +258,8 @@ void QUIT(){
     //     exit(0);
     // }
     // printf("%s\n", buf);
-    // exit(0);
+
+    exit(0);
 }
 
 
@@ -299,11 +304,13 @@ int main(int argc, char *argv[]){
         scanf("%s", keyword);
         if(strcmp(keyword, "HELO")==0){
             HELO();
+            discard_line();
         }
         else if(strcmp(keyword, "MAIL")==0){
             scanf("%s", keyword);
             if(strcmp(keyword, "FROM:")==0){
                 MAIL_FROM();
+                discard_line();
             }
             else{
                 printf("Invalid command. Discarding input.\n");
@@ -314,6 +321,7 @@ int main(int argc, char *argv[]){
             scanf("%s", keyword);
             if(strcmp(keyword, "TO:")==0){
                 RCPT_TO();
+                discard_line();
             }
             else{
                 printf("Invalid command. Discarding input.\n");
@@ -322,15 +330,19 @@ int main(int argc, char *argv[]){
         }
         else if(strcmp(keyword, "DATA")==0){
             DATA();
+            discard_line();
         }
         else if(strcmp(keyword, "LIST")==0){
             LIST();
+            discard_line();
         }
         else if(strcmp(keyword, "GET_MAIL")==0){
             GET_MAIL();
+            discard_line();
         }
         else if(strcmp(keyword, "QUIT")==0){
             QUIT();
+            discard_line();
         }
         else{
             printf("Invalid command. Discarding input.\n");
