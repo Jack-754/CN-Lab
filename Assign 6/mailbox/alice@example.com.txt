@@ -1,0 +1,6 @@
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+GOOD

@@ -20,3 +20,10 @@ DATE: (19-03-2025)
 DATA: 
 NICE
 TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE

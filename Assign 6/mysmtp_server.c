@@ -91,6 +91,33 @@ void send_server_error(){
     }
 }
 
+void safe_recv() {
+    int total_received = 0;
+
+    while (total_received < MAXSIZE - 1) {
+        int bytes_received = recv(newsockfd, buf + total_received, MAXSIZE - total_received - 1, 0);
+        if (bytes_received < 0) {
+            perror("Error receiving from server");
+            close(sockfd);
+            exit(1);
+        } else if (bytes_received == 0) {
+            printf("Server disconnected\n");
+            close(sockfd);
+            exit(1);
+        }
+
+        // Check if null terminator is received
+        if (memchr(buf+total_received, '\0', bytes_received) != NULL) {
+            total_received += bytes_received;
+            break;
+        }
+        total_received += bytes_received;
+    }
+
+    // Ensure buffer is null-terminated
+    buf[total_received] = '\0';
+}
+
 // Function to get the current date and time as a string
 void get_current_date(char *buffer, size_t size) {
     time_t t = time(NULL);
@@ -444,17 +471,7 @@ void child_process(){
     char s_email[100], r_email[100], clientid[100];;
 
     while(1){
-        int bytes_received = recv(newsockfd, buf, MAXSIZE, 0);
-        if(bytes_received<0){
-            perror("Error receiving from client\n");
-            close(newsockfd);
-            exit(0);
-        }
-        else if(bytes_received==0){
-            printf("Client disconnected\n");
-            close(newsockfd);
-            exit(0);
-        }
+        safe_recv();
         if(starts_with(buf, "HELO")){
             if(state!=INI){
                 sprintf(buf, "403 FORBIDDEN (DUPLICATE HELO REQUEST)");
@@ -687,7 +704,8 @@ int main(int argc, char *argv[]){
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         perror("Cannot create socket");
-        exit(0);
+        free_resources();
+        exit(1);
     }
 
     serv_addr.sin_family = AF_INET;

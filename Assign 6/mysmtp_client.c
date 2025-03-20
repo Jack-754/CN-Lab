@@ -28,9 +28,20 @@ struct sockaddr_in cli_addr, serv_addr;
 char buf[MAXSIZE];
 int sockfd;
 
+
 void discard_line() {
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF); // Consume remaining characters
+    struct timeval timeout = {0, 0};  // Non-blocking timeout
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+    FD_SET(STDIN_FILENO, &read_fds);
+
+    while (select(STDIN_FILENO + 1, &read_fds, NULL, NULL, &timeout) > 0) {
+        int c = getchar();
+        if (c == '\n' || c == EOF)
+            break;
+        FD_ZERO(&read_fds);
+        FD_SET(STDIN_FILENO, &read_fds);
+    }
 }
 
 
@@ -144,7 +155,7 @@ void RCPT_TO(){
 void DATA(){
     printf("Enter your message (end with a single dot'.'):\n");
     char line[MAXSIZE];
-    
+    strcpy(buf, "DATA");
     while(1){
         if (fgets(line, sizeof(line), stdin) == NULL) {
             perror("Error reading input");
