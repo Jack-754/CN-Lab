@@ -6,6 +6,8 @@
         "stdio.h": "c",
         "ksocket.h": "c",
         "k_socket.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "ip_icmp.h": "c",
+        "ip.h": "c"
     }
 }

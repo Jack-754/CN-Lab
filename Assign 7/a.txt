@@ -1,0 +1,3 @@
+scp -P 12000 cldp_server.c vm1@10.5.30.35:/home/vm1/Assign\ 7
+
+ssh vm1@10.5.30.35 -p 12000

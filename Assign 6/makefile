@@ -9,7 +9,7 @@ server: mysmtp_server.c
 	gcc $(CFLAGS) -o server mysmtp_server.c
 
 run_client:
-	./client 127.0.0.0 2525
+	./client 127.0.0.1 2525
 
 run_server:
 	./server 2525

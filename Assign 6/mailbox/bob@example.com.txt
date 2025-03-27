@@ -34,3 +34,513 @@ DATA:
 HI BOB
 HOW ARE YOU
 BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+hi
+nice to meet you
+?
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (19-03-2025)
+DATA: 
+WHY 
+DIS
+KOL
+VERI
+D
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (19-03-2025)
+DATA: 
+NICE
+TO MEET YOU
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (20-03-2025)
+DATA:
+HI
+YOU ARE GOOD?
+BYE
+@@@EMAIL@@@
+SENDER: alice@example.com
+DATE: (20-03-2025)
+DATA:
+HI BOB
+HOW ARE YOU
+BYE?
+@@@EMAIL@@@
+SENDER: charlie@example.com
+DATE: (21-03-2025)
+DATA:
+HI 
+BYE

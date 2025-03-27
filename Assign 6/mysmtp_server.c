@@ -87,7 +87,6 @@ void send_server_error(){
     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
         printf("Error sending reply to client\n");
         close(newsockfd);
-        exit(1);
     }
 }
 
@@ -212,7 +211,7 @@ void get_email_by_index(const char *filename, int target_index, int userid) {
     buf[0] = '\0';  // Initialize data buffer
 
     if(target_index<=0){
-        printf("Invalid index: %d\n", target_index);
+        printf("Invalid index: %d requested by user\n", target_index);
         sprintf(buf, "403 Invalid index requested");
         if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
             printf("Error sending reply to client\n");
@@ -253,10 +252,11 @@ void get_email_by_index(const char *filename, int target_index, int userid) {
     // Print the last email if it was found
     if (found) {
         sprintf(line, "200 OK\nSender: %s\nDate: %s\nData:\n%s", sender, date, buf);
+        printf("Email with id %d sent to user\n", target_index);
     }
 
     if(!found){
-        printf("Invalid index: %d\n", target_index);
+        printf("Invalid index: %d requested by user\n", target_index);
         sprintf(line, "401 NOT FOUND");
     }
 
@@ -274,13 +274,24 @@ void get_email_by_index(const char *filename, int target_index, int userid) {
 int HELO(char clientid[]){
     if (sscanf(buf, "HELO %s", clientid) == 1){
         printf("HELO received from %s\n", clientid);
-        sprintf(buf, "200 OK");
-        if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
-            printf("Error sending reply to client\n");
-            close(newsockfd);
-            exit(1);
+        if(!strcmp(clientid, "example.com")){
+            sprintf(buf, "200 OK");
+            if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
+                printf("Error sending reply to client\n");
+                close(newsockfd);
+                exit(1);
+            }
+            return 1;
         }
-        return 1;
+        else{
+            sprintf(buf, "403 FORBIDDEN (CONNECTION REQUEST FROM UNKNOWN CLIENT, example.com only valid client)");
+            if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
+                printf("Error sending reply to client\n");
+                close(newsockfd);
+                exit(1);
+            }
+            return 0;
+        }
     } 
     else{
         printf("Invalid format: %s\n", buf);
@@ -476,6 +487,7 @@ void child_process(){
         safe_recv();
         if(starts_with(buf, "HELO")){
             if(state!=INI){
+                printf("Duplicate HELO received from client\n");
                 sprintf(buf, "403 FORBIDDEN (DUPLICATE HELO REQUEST)");
                 if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                     printf("Error sending reply to client\n");
@@ -490,6 +502,7 @@ void child_process(){
         else if(starts_with(buf, "MAIL FROM:")){
             if(state!=FRE){
                 if(state==INI){
+                    printf("%s received before communication initiation\n", buf);
                     sprintf(buf, "403 FORBIDDEN (COMMUNICATION NOT INITIATED)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -498,6 +511,7 @@ void child_process(){
                     }
                 }
                 else if(state==RCP){
+                    printf("%s received instead of RCPT TO: request\n", buf);
                     sprintf(buf, "403 FORBIDDEN (WAITING FOR \"RCPT TO:\" REQUEST)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -506,6 +520,7 @@ void child_process(){
                     }
                 }
                 else if(state==DAT){
+                    printf("%s received instead of DATA request\n", buf);
                     sprintf(buf, "403 FORBIDDEN (WAITING FOR \"DATA\" REQUEST)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -521,6 +536,7 @@ void child_process(){
         else if(starts_with(buf, "RCPT TO:")){
             if(state!=RCP){
                 if(state==INI){
+                    printf("%s received before communication initiation\n", buf);
                     sprintf(buf, "403 FORBIDDEN (COMMUNICATION NOT INITIATED)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -529,6 +545,7 @@ void child_process(){
                     }
                 }
                 else if(state==FRE){
+                    printf("%s received before MAIL FROM: request\n", buf);
                     sprintf(buf, "403 FORBIDDEN (SEND \"MAIL TO:\" BEFORE \"RCPT TO:\" REQUEST)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -537,6 +554,7 @@ void child_process(){
                     }
                 }
                 else if(state==DAT){
+                    printf("%s received instead of DATA request\n", buf);
                     sprintf(buf, "403 FORBIDDEN (WAITING FOR \"DATA\" REQUEST)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -552,6 +570,7 @@ void child_process(){
         else if(starts_with(buf, "DATA")){
             if(state!=DAT){
                 if(state==INI){
+                    printf("DATA received before communication initiation\n");
                     sprintf(buf, "403 FORBIDDEN (COMMUNICATION NOT INITIATED)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -560,7 +579,8 @@ void child_process(){
                     }
                 }
                 else if(state==FRE || state==RCP){
-                    sprintf(buf, "403 FORBIDDEN (SEND \"RCPT TP:\" BEFORE \"DATA\" REQUEST)");
+                    printf("DATA received before RCPT TO: request\n");
+                    sprintf(buf, "403 FORBIDDEN (SEND \"RCPT TO:\" BEFORE \"DATA\" REQUEST)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
                         close(newsockfd);
@@ -575,6 +595,7 @@ void child_process(){
         else if(starts_with(buf, "LIST")){
             if(state!=FRE){
                 if(state==INI){
+                    printf("%s received before communication initiation\n", buf);
                     sprintf(buf, "403 FORBIDDEN (COMMUNICATION NOT INITIATED)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -583,6 +604,7 @@ void child_process(){
                     }
                 }
                 else if(state==RCP){
+                    printf("%s received instead of RCPT TO: request\n", buf);
                     sprintf(buf, "403 FORBIDDEN (WAITING FOR \"RCPT TO:\" REQUEST)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -591,6 +613,7 @@ void child_process(){
                     }
                 }
                 else if(state==DAT){
+                    printf("%s received instead of DATA request\n", buf);
                     sprintf(buf, "403 FORBIDDEN (WAITING FOR \"DATA\" REQUEST)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -604,6 +627,7 @@ void child_process(){
         else if(starts_with(buf, "GET_MAIL")){
             if(state!=FRE){
                 if(state==INI){
+                    printf("%s received before communication initiation\n", buf);
                     sprintf(buf, "403 FORBIDDEN (COMMUNICATION NOT INITIATED)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -612,6 +636,7 @@ void child_process(){
                     }
                 }
                 else if(state==RCP){
+                    printf("%s received instead of RCPT TO: request\n", buf);
                     sprintf(buf, "403 FORBIDDEN (WAITING FOR \"RCPT TO:\" REQUEST)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -620,6 +645,7 @@ void child_process(){
                     }
                 }
                 else if(state==DAT){
+                    printf("%s received instead of DATA request\n", buf);
                     sprintf(buf, "403 FORBIDDEN (WAITING FOR \"DATA\" REQUEST)");
                     if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                         printf("Error sending reply to client\n");
@@ -634,7 +660,7 @@ void child_process(){
             QUIT();
         }
         else{
-            printf("INVALID MSG RECEIVED from client: %s\n", client_ip);
+            printf("INVALID REQUEST RECEIVED from client: %s\n", client_ip);
             sprintf(buf, "400 ERR");
             if (send(newsockfd, buf, strlen(buf) + 1, 0) < 0){
                 printf("Error sending reply to client\n");
@@ -665,10 +691,14 @@ int main(int argc, char *argv[]){
         printf("Directory %s created successfully.\n", folder_name);
     }
 
+    // all users of the service are hard coded by admin
+    // if user is not registered, a mail can't be sent and received by him
+    // to add a user
     strcpy(users[0].email, "alice@example.com");
     strcpy(users[1].email, "bob@example.com");
     strcpy(users[2].email, "charlie@example.com");
-    usercount=3;
+    //strcpy(users[3].email, "charlie@example.com");    // Uncomment and Replace email, with the appropriate email. As admin, responsibility to add example.com emails only
+    usercount=3;    // change user count as appropriate
 
     pop.sem_num = vop.sem_num = 0;
     pop.sem_flg = vop.sem_flg = 0;
