@@ -52,10 +52,16 @@ void compute_my_ip() {
     printf("My IP: %s\n", inet_ntoa(*(struct in_addr *)&my_ip));
 }
 
-int main(){
+int main(int argc, char *argv[]){
+
+    if(argc<2){
+        printf("Enter: ip address for this device to use in simulation\n");
+        return 1;
+    }
+
     srand(time(NULL));
 
-    char buf[BUF_SIZE], packet[BUF_SIZE];
+    char recv_buf[BUF_SIZE], send_buf[BUF_SIZE];
     sockfd=socket(AF_INET, SOCK_RAW, 253);
     if(sockfd<0){
         perror("Unable to create raw socket");
@@ -65,14 +71,14 @@ int main(){
     setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one));
     signal(SIGINT, sigint_handler);
     
-
-    my_ip=inet_addr("127.0.0.1");
+    my_ip=inet_addr(argv[1]);
 
     struct sockaddr_in src;
     socklen_t len = sizeof(src);
 
     while(1){
-        int bytes = recvfrom(sockfd, buf, BUF_SIZE, 0, (struct sockaddr *)&src, &len);
+        memset(recv_buf, 0, BUF_SIZE);
+        int bytes = recvfrom(sockfd, recv_buf, BUF_SIZE, 0, (struct sockaddr *)&src, &len);
         if(bytes<0){
             perror("Unable to retrieve data from socket");
             return 1;
@@ -80,63 +86,65 @@ int main(){
 
         printf("Bytes received: %d\n", bytes);
         
-        struct iphdr *ip_buf = (struct iphdr*)buf;
+        struct iphdr *recv_ip_buf = (struct iphdr*)recv_buf;
 
-        if(ip_buf->protocol != 253){
+        if(recv_ip_buf->protocol != 253){
             continue;
         }
-        if(ip_buf->daddr != inet_addr("255.255.255.255") && ip_buf->daddr != my_ip){
+        if(src.sin_addr.s_addr == my_ip){
+            continue;
+        }
+        if(recv_ip_buf->daddr != inet_addr("255.255.255.255") && recv_ip_buf->daddr != my_ip){
             continue;
         }
 
-        char *custom_header = buf + ip_buf->ihl*4;
-        int msg_type, payload_len, tran_id, reserved;
-        memcpy(&msg_type, custom_header, 4);
-        memcpy(&payload_len, custom_header + 4, 4);
-        memcpy(&tran_id, custom_header + 8, 4);
-        memcpy(&reserved, custom_header + 12, 4);
+        char *recv_custom_header = recv_buf + recv_ip_buf->ihl*4;
+        int recv_msg_type, recv_payload_len, recv_tran_id, recv_reserved;
+        memcpy(&recv_msg_type, recv_custom_header, 4);
+        memcpy(&recv_payload_len, recv_custom_header + 4, 4);
+        memcpy(&recv_tran_id, recv_custom_header + 8, 4);
+        memcpy(&recv_reserved, recv_custom_header + 12, 4);
 
-        printf("C: Received message type: %d\n", msg_type);
+        printf("C: Received message type: %d\n", recv_msg_type);
 
-        msg_type = ntohl(msg_type);
-        payload_len = ntohl(payload_len);
-        tran_id = ntohl(tran_id);
-        reserved = ntohl(reserved);
+        recv_msg_type = ntohl(recv_msg_type);
+        recv_payload_len = ntohl(recv_payload_len);
+        recv_tran_id = ntohl(recv_tran_id);
+        recv_reserved = ntohl(recv_reserved);
 
+        if(recv_msg_type&HELLO){
+            printf("Received HELLO message from %s of type %d\n", inet_ntoa(src.sin_addr), recv_msg_type);
 
-        if(msg_type&HELLO){
-            printf("Received HELLO message from %s of type %d\n", inet_ntoa(src.sin_addr), msg_type);
+            struct iphdr *send_ip_packet = (struct iphdr*)send_buf;
+            memset(send_buf, 0, BUF_SIZE);
+            send_ip_packet->version = 4;
+            send_ip_packet->ihl = 5;
+            send_ip_packet->ttl = 64;
+            send_ip_packet->protocol = 253;
+            send_ip_packet->saddr = my_ip;
+            send_ip_packet->daddr = src.sin_addr.s_addr;
+            send_ip_packet->tot_len = htons(send_ip_packet->ihl*4 + 16);
 
-            struct iphdr *ip_packet = (struct iphdr*)packet;
-            memset(packet, 0, BUF_SIZE);
-            ip_packet->version = 4;
-            ip_packet->ihl = 5;
-            ip_packet->ttl = 64;
-            ip_packet->protocol = 253;
-            ip_packet->saddr = my_ip;
-            ip_packet->daddr = src.sin_addr.s_addr;
-            ip_packet->tot_len = htons(ip_packet->ihl*4 + 16);
+            char *send_custom_header = send_buf + send_ip_packet->ihl*4;
 
-            char *custom_header_send = packet + ip_packet->ihl*4;
+            int send_query_avail[] = {CPULOAD, SYSTIME, HOSTNAME};
+            int send_random_query = send_query_avail[rand()%3];
 
-            int query_avail[] = {CPULOAD, SYSTIME, HOSTNAME};
-            int random_query = query_avail[rand()%3];
+            int send_msg_type = htonl(QUERY | send_random_query);
+            int send_payload_len = htonl(0);
+            int send_tran_id = htonl(0);
+            int send_reserved = htonl(0);
 
-            int msg_type_send = htonl(QUERY | random_query);
-            int payload_len_send = htonl(0);
-            int tran_id_send = htonl(0);
-            int reserved_send = htonl(0);
+            memcpy(send_custom_header, &send_msg_type, 4);
+            memcpy(send_custom_header+4, &send_payload_len, 4);
+            memcpy(send_custom_header+8, &send_tran_id, 4);
+            memcpy(send_custom_header+12, &send_reserved, 4);
 
-            memcpy(custom_header_send, &msg_type_send, 4);
-            memcpy(custom_header_send+4, &payload_len_send, 4);
-            memcpy(custom_header_send+8, &tran_id_send, 4);
-            memcpy(custom_header_send+12, &reserved_send, 4);
+            printf("C: Sent message type: %d\n", send_msg_type);
 
-            printf("C: Sent message type: %d\n", msg_type_send);
+            sendto(sockfd, send_buf, send_ip_packet->ihl*4 + 16, 0, (struct sockaddr *)&src, len);
 
-            sendto(sockfd, packet, ip_packet->ihl*4 + 16, 0, (struct sockaddr *)&src, len);
-
-            switch (random_query){
+            switch (send_random_query){
             case CPULOAD:
                 printf("Sent CPULOAD query to %s\n", inet_ntoa(src.sin_addr));
                 break;
@@ -147,20 +155,23 @@ int main(){
                 printf("Sent HOSTNAME query to %s\n", inet_ntoa(src.sin_addr));
                 break;
             default:
-                printf("Invalid query %d \n", random_query);
+                printf("Invalid query %d \n", send_random_query);
                 break;
             }
             sleep(5);
         }
-        else if(msg_type&RESPONSE){
-            char *payload = custom_header + 16;
+        else if(recv_msg_type&RESPONSE){
+            char *recv_payload = recv_custom_header + 16;
             printf("Received RESPONSE message from %s\n", inet_ntoa(src.sin_addr));
-            if(msg_type & CPULOAD) printf("CPULOAD: %s\n", payload);
-            else if(msg_type & SYSTIME) printf("SYSTIME: %s\n", payload);
-            else if(msg_type & HOSTNAME) printf("HOSTNAME: %s\n", payload);
+            if (recv_msg_type & CPULOAD) 
+                printf("CPULOAD: %.*s\n", recv_payload_len, recv_payload);
+            else if (recv_msg_type & SYSTIME) 
+                printf("SYSTIME: %.*s\n", recv_payload_len, recv_payload);
+            else if (recv_msg_type & HOSTNAME) 
+                printf("HOSTNAME: %.*s\n", recv_payload_len, recv_payload);
         }
         else{
-            printf("Invalid message type %d\n", msg_type);
+            printf("Invalid message type %d\n", recv_msg_type);
         }
 
     }
