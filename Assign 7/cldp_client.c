@@ -7,7 +7,6 @@
 #include <arpa/inet.h> // inet_ntoa
 #include <signal.h> // signal
 #include <time.h>
-#include <ifaddrs.h> // getifaddrs
 
 #define BUF_SIZE 65536
 
@@ -24,32 +23,6 @@ uint32_t my_ip = 0;
 void sigint_handler() {
     close(sockfd);
     exit(0);
-}
-
-void compute_my_ip() {
-    struct ifaddrs *ifaddr, *ifa;
-    if (getifaddrs(&ifaddr) == -1) {
-        perror("getifaddrs");
-        exit(1);
-    }
-
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
-            struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;
-            if (strncmp(ifa->ifa_name, "lo", 2) != 0) {  // Ignore loopback
-                my_ip = sa->sin_addr.s_addr;
-                break;
-            }
-        }
-    }
-    freeifaddrs(ifaddr);
-
-    if (my_ip == 0) {
-        fprintf(stderr, "Could not determine local IP\n");
-        exit(1);
-    }
-
-    printf("My IP: %s\n", inet_ntoa(*(struct in_addr *)&my_ip));
 }
 
 int main(int argc, char *argv[]){
@@ -83,8 +56,6 @@ int main(int argc, char *argv[]){
             perror("Unable to retrieve data from socket");
             return 1;
         }
-
-        printf("Bytes received: %d\n", bytes);
         
         struct iphdr *recv_ip_buf = (struct iphdr*)recv_buf;
 
@@ -105,15 +76,13 @@ int main(int argc, char *argv[]){
         memcpy(&recv_tran_id, recv_custom_header + 8, 4);
         memcpy(&recv_reserved, recv_custom_header + 12, 4);
 
-        printf("C: Received message type: %d\n", recv_msg_type);
-
         recv_msg_type = ntohl(recv_msg_type);
         recv_payload_len = ntohl(recv_payload_len);
         recv_tran_id = ntohl(recv_tran_id);
         recv_reserved = ntohl(recv_reserved);
 
         if(recv_msg_type&HELLO){
-            printf("Received HELLO message from %s of type %d\n", inet_ntoa(src.sin_addr), recv_msg_type);
+            printf("Received HELLO message from %s (Transaction id: %d)\n", inet_ntoa(src.sin_addr), recv_tran_id);
 
             struct iphdr *send_ip_packet = (struct iphdr*)send_buf;
             memset(send_buf, 0, BUF_SIZE);
@@ -132,7 +101,7 @@ int main(int argc, char *argv[]){
 
             int send_msg_type = htonl(QUERY | send_random_query);
             int send_payload_len = htonl(0);
-            int send_tran_id = htonl(0);
+            int send_tran_id = htonl(recv_tran_id);
             int send_reserved = htonl(0);
 
             memcpy(send_custom_header, &send_msg_type, 4);
@@ -140,29 +109,26 @@ int main(int argc, char *argv[]){
             memcpy(send_custom_header+8, &send_tran_id, 4);
             memcpy(send_custom_header+12, &send_reserved, 4);
 
-            printf("C: Sent message type: %d\n", send_msg_type);
-
             sendto(sockfd, send_buf, send_ip_packet->ihl*4 + 16, 0, (struct sockaddr *)&src, len);
 
             switch (send_random_query){
             case CPULOAD:
-                printf("Sent CPULOAD query to %s\n", inet_ntoa(src.sin_addr));
+                printf("Sent CPULOAD query to %s (Transaction id: %d)\n", inet_ntoa(src.sin_addr), recv_tran_id);
                 break;
             case SYSTIME:
-                printf("Sent SYSTIME query to %s\n", inet_ntoa(src.sin_addr));
+                printf("Sent SYSTIME query to %s (Transaction id: %d)\n", inet_ntoa(src.sin_addr), recv_tran_id);
                 break;
             case HOSTNAME:
-                printf("Sent HOSTNAME query to %s\n", inet_ntoa(src.sin_addr));
+                printf("Sent HOSTNAME query to %s (Transaction id: %d)\n", inet_ntoa(src.sin_addr), recv_tran_id);
                 break;
             default:
                 printf("Invalid query %d \n", send_random_query);
                 break;
             }
-            sleep(5);
         }
         else if(recv_msg_type&RESPONSE){
             char *recv_payload = recv_custom_header + 16;
-            printf("Received RESPONSE message from %s\n", inet_ntoa(src.sin_addr));
+            printf("Received RESPONSE message from %s (Transaction id: %d)\n", inet_ntoa(src.sin_addr), recv_tran_id);
             if (recv_msg_type & CPULOAD) 
                 printf("CPULOAD: %.*s\n", recv_payload_len, recv_payload);
             else if (recv_msg_type & SYSTIME) 

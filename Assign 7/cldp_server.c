@@ -2,9 +2,6 @@
 #include <stdlib.h> // malloc
 #include <string.h> // memset
 #include <unistd.h> // close syscall
-#include <netinet/tcp.h> // TCP header
-#include <netinet/udp.h> // UDP header
-#include <netinet/ip_icmp.h> // ICMP header
 #include <netinet/ip.h> // IP header
 #include <sys/socket.h> // Socket's APIs
 #include <sys/select.h> // select
@@ -13,7 +10,6 @@
 #include <sys/sysinfo.h> // sysinfo
 #include <arpa/inet.h> // inet_ntoa
 #include <signal.h> // signal
-#include <ifaddrs.h> // getifaddrs
 #include <time.h>
 
 #define BUF_SIZE 65536
@@ -33,31 +29,6 @@ void sigint_handler() {
     exit(0);
 }
 
-void compute_my_ip() {
-    struct ifaddrs *ifaddr, *ifa;
-    if (getifaddrs(&ifaddr) == -1) {
-        perror("getifaddrs");
-        exit(1);
-    }
-
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
-            struct sockaddr_in *sa = (struct sockaddr_in *)ifa->ifa_addr;
-            if (strncmp(ifa->ifa_name, "lo", 2) != 0) {  // Ignore loopback
-                my_ip = sa->sin_addr.s_addr;
-                break;
-            }
-        }
-    }
-    freeifaddrs(ifaddr);
-
-    if (my_ip == 0) {
-        fprintf(stderr, "Could not determine local IP\n");
-        exit(1);
-    }
-
-    printf("My IP: %s\n", inet_ntoa(*(struct in_addr *)&my_ip));
-}
 
 void get_hostname(char *buffer, size_t size) {
     if(size>BUF_SIZE){
@@ -77,8 +48,7 @@ void get_sysinfo(char *buffer, size_t size) {
     }
     struct sysinfo info;
     if (sysinfo(&info) == 0) {
-        snprintf(buffer, size, "System Uptime: %ld seconds\nLoad Average: %.2f, %.2f, %.2f",
-                 info.uptime,
+        snprintf(buffer, size, "Load Average: %.2f, %.2f, %.2f",
                  info.loads[0] / 65536.0,
                  info.loads[1] / 65536.0,
                  info.loads[2] / 65536.0);
@@ -124,11 +94,12 @@ int main(int argc, char *argv[]){
     signal(SIGINT, sigint_handler);
 
     my_ip=inet_addr(argv[1]);
+    int cur_transaction_id=0;
 
     struct sockaddr_in src;
     socklen_t len = sizeof(src);
 
-    printf("Sending first Hello!\n");
+    printf("Sending first Hello! (Transaction id: %d)\n", cur_transaction_id);
     struct iphdr *send_ip_packet = (struct iphdr*)send_buf;
     memset(send_buf, 0, BUF_SIZE);
     send_ip_packet->version = 4;
@@ -143,10 +114,8 @@ int main(int argc, char *argv[]){
 
     int send_msg_type = htonl(HELLO);
     int send_payload_len = htonl(0);
-    int send_tran_id = htonl(0);
+    int send_tran_id = htonl(cur_transaction_id);
     int send_reserved = htonl(0);
-
-    printf("S: Sent message type: %d\n", send_msg_type);
 
     memcpy(send_custom_header, &send_msg_type, 4);
     memcpy(send_custom_header+4, &send_payload_len, 4);
@@ -154,20 +123,19 @@ int main(int argc, char *argv[]){
     memcpy(send_custom_header+12, &send_reserved, 4);
 
     sendto(sockfd, send_buf, send_ip_packet->ihl*4 + 16, 0, (struct sockaddr *)&src, len);
-    printf("Bytes sent: %d\n", send_ip_packet->ihl*4 + 16);
-    sleep(5);
+
+    // Set timeout of 10 seconds
+
+    struct timeval timeout;
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
 
     while(1){
         fd_set readfds;
-        struct timeval timeout;
 
         // Initialize the fd_set
         FD_ZERO(&readfds);
         FD_SET(sockfd, &readfds);
-
-        // Set timeout of 10 seconds
-        timeout.tv_sec = 10;
-        timeout.tv_usec = 0;
 
         // Wait for data on sockfd
         int activity = select(sockfd + 1, &readfds, NULL, NULL, &timeout);
@@ -177,7 +145,12 @@ int main(int argc, char *argv[]){
             return 1;
         } 
         else if (activity == 0) {
-            printf("Timeout! Sending Hello!\n");
+            // Reset on timeout
+            timeout.tv_sec = 10;
+            timeout.tv_usec = 0;
+            cur_transaction_id++;
+
+            printf("Timeout! Sending Hello! (Transaction id: %d)\n", cur_transaction_id);
             struct iphdr *send_ip_packet = (struct iphdr*)send_buf;
             memset(send_buf, 0, BUF_SIZE);
             send_ip_packet->version = 4;
@@ -192,10 +165,8 @@ int main(int argc, char *argv[]){
 
             int send_msg_type = htonl(HELLO);
             int send_payload_len = htonl(0);
-            int send_tran_id = htonl(0);
+            int send_tran_id = htonl(cur_transaction_id);
             int send_reserved = htonl(0);
-
-            printf("S: Sent message type: %d\n", send_msg_type);
 
             memcpy(send_custom_header, &send_msg_type, 4);
             memcpy(send_custom_header+4, &send_payload_len, 4);
@@ -203,7 +174,6 @@ int main(int argc, char *argv[]){
             memcpy(send_custom_header+12, &send_reserved, 4);
 
             sendto(sockfd, send_buf, send_ip_packet->ihl*4 + 16, 0, (struct sockaddr *)&src, len);
-            sleep(5);
             continue;
         }
 
@@ -214,8 +184,6 @@ int main(int argc, char *argv[]){
             perror("recvfrom() failed");
             return 1;
         }
-
-        printf("Bytes received: %d\n", bytes);
 
         struct iphdr *recv_ip_buf = (struct iphdr*)recv_buf;
 
@@ -242,17 +210,13 @@ int main(int argc, char *argv[]){
         recv_tran_id = ntohl(recv_tran_id);
         recv_reserved = ntohl(recv_reserved);
 
-        printf("S: Recieved message type: %d\n", recv_msg_type);
-
         if(recv_msg_type&HELLO){
-            printf("Received HELLO message from %s\n", inet_ntoa(src.sin_addr));
+            printf("Received HELLO message from %s (Transaction id: %d)\n", inet_ntoa(src.sin_addr), recv_tran_id);
         }
         else if(recv_msg_type&QUERY){
-            printf("Received QUERY message from %s\n", inet_ntoa(src.sin_addr));
+            printf("Received QUERY message from %s (Transaction id: %d) for", inet_ntoa(src.sin_addr), recv_tran_id);
 
             int recv_query_type = recv_msg_type ^ QUERY;
-
-            printf("Query type: %d\n", recv_query_type);
 
             struct iphdr *send_ip_packet = (struct iphdr*)send_buf;
             memset(send_buf, 0, BUF_SIZE);
@@ -269,22 +233,25 @@ int main(int argc, char *argv[]){
 
             switch (recv_query_type){
             case CPULOAD:
-                printf("Sent CPULOAD response to %s\n", inet_ntoa(src.sin_addr));
+                printf(" CPULOAD\n");
+                printf("Sent CPULOAD in response to %s\n", inet_ntoa(src.sin_addr));
                 get_sysinfo(send_payload, BUF_SIZE-(send_ip_packet->ihl*4 + 16)-1);
                 break;
             case SYSTIME:
-                printf("Sent SYSTIME response to %s\n", inet_ntoa(src.sin_addr));
+                printf(" SYSTIME\n");
+                printf("Sent SYSTIME in response to %s\n", inet_ntoa(src.sin_addr));
                 get_time(send_payload, BUF_SIZE-(send_ip_packet->ihl*4 + 16)-1);
                 break;
             case HOSTNAME:
-                printf("Sent HOSTNAME response to %s\n", inet_ntoa(src.sin_addr));
+                printf(" HOSTNAME\n");
+                printf("Sent HOSTNAME in response to %s\n", inet_ntoa(src.sin_addr));
                 get_hostname(send_payload, BUF_SIZE-(send_ip_packet->ihl*4 + 16)-1);
                 break;
             }
 
             int send_msg_type = htonl(RESPONSE | recv_query_type);
             int send_payload_len = htonl(strlen(send_payload));
-            int send_tran_id = htonl(0);
+            int send_tran_id = htonl(recv_tran_id);
             int send_reserved = htonl(0);
 
             memcpy(send_custom_header, &send_msg_type, 4);
@@ -293,8 +260,6 @@ int main(int argc, char *argv[]){
             memcpy(send_custom_header+12, &send_reserved, 4);
 
             send_ip_packet->tot_len = htons(send_ip_packet->ihl*4 + 16 + ntohl(send_payload_len));
-            
-            printf("S: Sent message type (response): %d\n", send_msg_type);
 
             sendto(sockfd, send_buf, send_ip_packet->ihl*4 + 16 + ntohl(send_payload_len), 0, (struct sockaddr *)&src, len);
 
