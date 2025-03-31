@@ -96,7 +96,11 @@ int main(int argc, char *argv[]){
     }
     int one = 1;
     setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one));
-
+    int broadcast_enable = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast_enable, sizeof(broadcast_enable)) < 0) {
+        perror("Failed to set broadcast option");
+        return 1;
+    }
     signal(SIGINT, sigint_handler);
 
     my_ip=inet_addr(argv[1]);

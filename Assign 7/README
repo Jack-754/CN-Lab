@@ -9,7 +9,9 @@ Run Instructions:
     For server: sudo ./cldp_server <server ip for this process>
 
     Pass distinct ip addresses to each process to simulate the process running on different machines with different ip's
-    The ip's should be for form 127.0.0.x where x can be replaced with (2, 3, 4, ...)
+
+    NOTE: THE IP'S SHOULD BE OF THE FORM 127.0.0.X WHERE X CAN BE REPLACED WITH (2, 3, 4, ...), WHEN RUNNING ON A SINGLE MACHINE
+
     Once started, no human intervention required. For every HELLO, client randomly chooses among the three available queries (CPULOAD, HOSTNAME, SYSTIME), and crafts a packet querying it and sends it to server from whom HELLO was received.
 
 Assumption:
@@ -20,10 +22,11 @@ Assumption:
     4. Assumed no need to store server details which are known to be active as they announce themselves  every 10 seconds.
     5. Transaction id is maintained and incremented by server for every HELLO packet it sends. QUERY and RESPONSE packets triggered by a give HELLO packet have the same transaction id as the HELLO packet.
     6. Only one type of query can be sent at a time (among CPULOAD, HOSTNAME, SYSTIME).
-
+    
 Limitation:
     1. Tested only on a single computer running all processes with correct and distinct loopback ip addresses as input. No testing of whether works correctly when server and client on different computers.
     2. No human input is required after a process is started as, there may be multiple servers and clients, and choosing what to query everytime will be slow thus, allowed the client to randomly choose what to query.
+    3. Due to router restrictions on broadcast packets, could not test when client and server on different computers.
 
 Demo:
     127.0.0.2: Client 1
