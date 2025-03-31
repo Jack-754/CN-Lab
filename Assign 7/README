@@ -1,0 +1,34 @@
+Build Instructions:
+
+    gcc -o cldp_server cldp_server.c
+    gcc -o cldp_client cldp_client.c
+
+Run Instructions:
+
+    For client: sudo ./cldp_client <client ip for this process>
+    For server: sudo ./cldp_server <server ip for this process>
+
+    Pass distinct ip addresses to each process to simulate the process running on different machines with different ip's
+    The ip's should be for form 127.0.0.x where x can be replaced with (2, 3, 4, ...)
+    Once started, no human intervention required. For every HELLO, client randomly chooses among the three available queries (CPULOAD, HOSTNAME, SYSTIME), and crafts a packet querying it and sends it to server from whom HELLO was received.
+
+Assumption:
+
+    1. Assumed all processes will be run on the same computer, with distinct loopback ip addresses being passed to each so that each processes can identify the packets it is meant to receive and ignore others.
+    2. Assumed client doesn't send HELLO or RESPONSE as no queries are sent to a client.
+    3. Assumed server doesn't send QUERY and ignore HELLO, RESPONSE packets of other servers.
+    4. Assumed no need to store server details which are known to be active as they announce themselves  every 10 seconds.
+    5. Transaction id is maintained and incremented by server for every HELLO packet it sends. QUERY and RESPONSE packets triggered by a give HELLO packet have the same transaction id as the HELLO packet.
+    6. Only one type of query can be sent at a time (among CPULOAD, HOSTNAME, SYSTIME).
+
+Limitation:
+    1. Tested only on a single computer running all processes with correct and distinct loopback ip addresses as input. No testing of whether works correctly when server and client on different computers.
+    2. No human input is required after a process is started as, there may be multiple servers and clients, and choosing what to query everytime will be slow thus, allowed the client to randomly choose what to query.
+
+Demo:
+    127.0.0.2: Client 1
+    127.0.0.3: Client 2
+    127.0.0.4: Server 1
+    127.0.0.5: Server 2
+
+    pcap file: https://drive.google.com/drive/folders/1b1DBQeaBoFAowA8bk45zlDb2H44hhF5U?usp=sharing

@@ -1,3 +1,9 @@
+// =====================================
+// Assignment 7 Submission
+// Name: More Aayush Babasaheb
+// Roll number: 22CS30063
+// =====================================
+
 #include <stdio.h> // printf, puts, perror
 #include <stdlib.h> // malloc
 #include <string.h> // memset
@@ -110,6 +116,11 @@ int main(int argc, char *argv[]){
     send_ip_packet->daddr = inet_addr("255.255.255.255");
     send_ip_packet->tot_len = htons(send_ip_packet->ihl*4 + 16);
 
+    src.sin_family = AF_INET;
+    src.sin_port = 0;
+    src.sin_addr.s_addr = inet_addr("255.255.255.255");
+    len = sizeof(src);
+
     char *send_custom_header = send_buf + send_ip_packet->ihl*4;
 
     int send_msg_type = htonl(HELLO);
@@ -160,6 +171,11 @@ int main(int argc, char *argv[]){
             send_ip_packet->saddr = my_ip;
             send_ip_packet->daddr = inet_addr("255.255.255.255");
             send_ip_packet->tot_len = htons(send_ip_packet->ihl*4 + 16);
+
+            src.sin_family = AF_INET;
+            src.sin_port = 0;
+            src.sin_addr.s_addr = inet_addr("255.255.255.255");
+            len = sizeof(src);
 
             char *send_custom_header = send_buf + send_ip_packet->ihl*4;
 

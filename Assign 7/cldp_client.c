@@ -1,3 +1,9 @@
+// =====================================
+// Assignment 7 Submission
+// Name: More Aayush Babasaheb
+// Roll number: 22CS30063
+// =====================================
+
 #include <stdio.h> // printf, puts, perror
 #include <stdlib.h> // malloc
 #include <string.h> // memset
