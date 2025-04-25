@@ -5,6 +5,12 @@
         "socket.h": "c",
         "stdio.h": "c",
         "ksocket.h": "c",
-        "k_socket.h": "c"
+        "k_socket.h": "c",
+        "stdlib.h": "c",
+        "ip_icmp.h": "c",
+        "ip.h": "c",
+        "strings.h": "c",
+        "types.h": "c",
+        "pthreadtypes.h": "c"
     }
 }
